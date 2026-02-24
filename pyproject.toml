@@ -1,0 +1,23 @@
+[project]
+name = "lando"
+version = "0.1.0"
+description = "Lando - MTProto bridge for OpenClaw"
+requires-python = ">=3.10"
+dependencies = [
+    "pyrofork>=2.3",
+    "tgcrypto>=1.2",
+    "httpx>=0.28",
+    "pydantic-settings>=2.0",
+    "mcp>=1.0",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+lando = "lando.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lando"]
