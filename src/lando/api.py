@@ -201,6 +201,340 @@ async def get_monitored_chats(request: Request) -> JSONResponse:
 # ==================== Health ====================
 
 
+# ==================== Edit / Delete ====================
+
+
+async def edit_message(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    text = body.get("text", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.edit_message(cid, message_id, text))
+
+
+async def delete_messages(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_ids = body.get("message_ids", [])
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.delete_messages(cid, message_ids))
+
+
+# ==================== Pin / Unpin ====================
+
+
+async def pin_message(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    disable_notification = body.get("disable_notification", False)
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.pin_message(cid, message_id, disable_notification=disable_notification))
+
+
+async def unpin_message(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.unpin_message(cid, message_id))
+
+
+async def unpin_all_messages(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.unpin_all_messages(cid))
+
+
+# ==================== Chat management ====================
+
+
+async def create_group(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    title = body.get("title", "")
+    users = body.get("users", [])
+    return JSONResponse(await tg.create_group(title, users))
+
+
+async def create_channel(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    title = body.get("title", "")
+    description = body.get("description", "")
+    return JSONResponse(await tg.create_channel(title, description))
+
+
+async def create_supergroup(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    title = body.get("title", "")
+    description = body.get("description", "")
+    return JSONResponse(await tg.create_supergroup(title, description))
+
+
+async def set_chat_title(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    title = body.get("title", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.set_chat_title(cid, title))
+
+
+async def set_chat_description(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    description = body.get("description", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.set_chat_description(cid, description))
+
+
+async def delete_chat_photo(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.delete_chat_photo(cid))
+
+
+async def archive_chats(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_ids = body.get("chat_ids", [])
+    return JSONResponse(await tg.archive_chats(chat_ids))
+
+
+async def unarchive_chats(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_ids = body.get("chat_ids", [])
+    return JSONResponse(await tg.unarchive_chats(chat_ids))
+
+
+async def export_chat_invite_link(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.export_chat_invite_link(cid))
+
+
+async def create_chat_invite_link(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    name = body.get("name", "")
+    expire_date = body.get("expire_date")
+    member_limit = int(body.get("member_limit", 0))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.create_chat_invite_link(cid, name, expire_date, member_limit))
+
+
+# ==================== User / Member management ====================
+
+
+async def ban_chat_member(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    user_id = int(body.get("user_id", 0))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.ban_chat_member(cid, user_id))
+
+
+async def unban_chat_member(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    user_id = int(body.get("user_id", 0))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.unban_chat_member(cid, user_id))
+
+
+async def restrict_chat_member(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    user_id = int(body.get("user_id", 0))
+    permissions = body.get("permissions", {})
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.restrict_chat_member(cid, user_id, permissions))
+
+
+async def promote_chat_member(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    user_id = int(body.get("user_id", 0))
+    privileges = body.get("privileges", {})
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.promote_chat_member(cid, user_id, privileges))
+
+
+async def add_chat_members(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    user_ids = body.get("user_ids", [])
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.add_chat_members(cid, user_ids))
+
+
+async def block_user(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    user_id = int(body.get("user_id", 0))
+    return JSONResponse(await tg.block_user(user_id))
+
+
+async def unblock_user(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    user_id = int(body.get("user_id", 0))
+    return JSONResponse(await tg.unblock_user(user_id))
+
+
+async def get_users(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    user_ids = body.get("user_ids", [])
+    return JSONResponse(await tg.get_users(user_ids))
+
+
+async def get_profile_photos(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    limit = int(body.get("limit", 10))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.get_profile_photos(cid, limit))
+
+
+# ==================== Polls ====================
+
+
+async def send_poll(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    question = body.get("question", "")
+    options = body.get("options", [])
+    is_anonymous = body.get("is_anonymous", True)
+    poll_type = body.get("poll_type", "regular")
+    allows_multiple = body.get("allows_multiple_answers", False)
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.send_poll(cid, question, options, is_anonymous, poll_type, allows_multiple))
+
+
+async def stop_poll(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.stop_poll(cid, message_id))
+
+
+async def vote_poll(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    option_ids = body.get("option_ids", [])
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.vote_poll(cid, message_id, option_ids))
+
+
+# ==================== Copy / Scheduled / Get messages ====================
+
+
+async def copy_message(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    to_id = body.get("to_chat_id", "")
+    from_id = body.get("from_chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    to_cid = int(to_id) if str(to_id).lstrip("-").isdigit() else to_id
+    from_cid = int(from_id) if str(from_id).lstrip("-").isdigit() else from_id
+    return JSONResponse(await tg.copy_message(to_cid, from_cid, message_id))
+
+
+async def send_scheduled_message(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    text = body.get("text", "")
+    schedule_date = body.get("schedule_date", 0)
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.send_scheduled_message(cid, text, schedule_date))
+
+
+async def get_messages(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_ids = body.get("message_ids", [])
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.get_messages(cid, message_ids))
+
+
+async def download_media(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.download_media(cid, message_id))
+
+
+# ==================== Location / Contact ====================
+
+
+async def send_location(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    latitude = float(body.get("latitude", 0))
+    longitude = float(body.get("longitude", 0))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.send_location(cid, latitude, longitude))
+
+
+async def send_contact(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    phone = body.get("phone_number", "")
+    first_name = body.get("first_name", "")
+    last_name = body.get("last_name", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.send_contact(cid, phone, first_name, last_name))
+
+
+# ==================== Misc ====================
+
+
+async def set_typing(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    action = body.get("action", "typing")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.set_typing(cid, action))
+
+
+# ==================== Health ====================
+
+
 async def health(request: Request) -> JSONResponse:
     tg = _require_tg()
     return JSONResponse({"status": "ok", "running": tg._running})
@@ -216,6 +550,8 @@ def create_app() -> Starlette:
             # Account
             Route("/api/me", get_me, methods=["GET"]),
             Route("/api/contacts", get_contacts, methods=["GET"]),
+            Route("/api/users", get_users, methods=["POST"]),
+            Route("/api/users/photos", get_profile_photos, methods=["POST"]),
             # Chats
             Route("/api/dialogs", get_dialogs, methods=["GET"]),
             Route("/api/chat/info", get_chat_info, methods=["POST"]),
@@ -224,12 +560,49 @@ def create_app() -> Starlette:
             Route("/api/chat/join", join_chat, methods=["POST"]),
             Route("/api/chat/leave", leave_chat, methods=["POST"]),
             Route("/api/chat/read", mark_read, methods=["POST"]),
+            Route("/api/chat/create/group", create_group, methods=["POST"]),
+            Route("/api/chat/create/channel", create_channel, methods=["POST"]),
+            Route("/api/chat/create/supergroup", create_supergroup, methods=["POST"]),
+            Route("/api/chat/title", set_chat_title, methods=["POST"]),
+            Route("/api/chat/description", set_chat_description, methods=["POST"]),
+            Route("/api/chat/photo/delete", delete_chat_photo, methods=["POST"]),
+            Route("/api/chat/archive", archive_chats, methods=["POST"]),
+            Route("/api/chat/unarchive", unarchive_chats, methods=["POST"]),
+            Route("/api/chat/invite/export", export_chat_invite_link, methods=["POST"]),
+            Route("/api/chat/invite/create", create_chat_invite_link, methods=["POST"]),
             # Messages
             Route("/api/message/send", send_message, methods=["POST"]),
+            Route("/api/message/edit", edit_message, methods=["POST"]),
+            Route("/api/message/delete", delete_messages, methods=["POST"]),
+            Route("/api/message/pin", pin_message, methods=["POST"]),
+            Route("/api/message/unpin", unpin_message, methods=["POST"]),
+            Route("/api/message/unpin/all", unpin_all_messages, methods=["POST"]),
             Route("/api/message/search", search_messages, methods=["POST"]),
             Route("/api/message/forward", forward_messages, methods=["POST"]),
+            Route("/api/message/copy", copy_message, methods=["POST"]),
             Route("/api/message/react", send_reaction, methods=["POST"]),
+            Route("/api/message/get", get_messages, methods=["POST"]),
+            Route("/api/message/scheduled", send_scheduled_message, methods=["POST"]),
+            Route("/api/message/media/download", download_media, methods=["POST"]),
             Route("/api/search/global", search_global, methods=["POST"]),
+            # Members
+            Route("/api/member/ban", ban_chat_member, methods=["POST"]),
+            Route("/api/member/unban", unban_chat_member, methods=["POST"]),
+            Route("/api/member/restrict", restrict_chat_member, methods=["POST"]),
+            Route("/api/member/promote", promote_chat_member, methods=["POST"]),
+            Route("/api/member/add", add_chat_members, methods=["POST"]),
+            # User actions
+            Route("/api/user/block", block_user, methods=["POST"]),
+            Route("/api/user/unblock", unblock_user, methods=["POST"]),
+            # Polls
+            Route("/api/poll/send", send_poll, methods=["POST"]),
+            Route("/api/poll/stop", stop_poll, methods=["POST"]),
+            Route("/api/poll/vote", vote_poll, methods=["POST"]),
+            # Location / Contact
+            Route("/api/send/location", send_location, methods=["POST"]),
+            Route("/api/send/contact", send_contact, methods=["POST"]),
+            # Misc
+            Route("/api/typing", set_typing, methods=["POST"]),
             # Live Feed
             Route("/api/feed/new", get_new_feed, methods=["GET"]),
             Route("/api/feed/chat", get_chat_feed, methods=["POST"]),
