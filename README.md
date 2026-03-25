@@ -4,11 +4,27 @@ Lightweight Telegram gateway that exposes your account as a **REST API** and **M
 
 Give any HTTP client, AI agent, or automation tool full programmatic access to Telegram — send messages, read history, click inline buttons, manage groups, and more.
 
+## Why not the Bot API?
+
+Telegram bots can't read channels, can't browse chat history, can't join groups on their own, and can't see messages unless explicitly added as admin. Lando uses a **real user account** via MTProto — the same protocol as the Telegram app — so it can do everything a human user can:
+
+| Capability | Bot API | Lando (MTProto) |
+|------------|---------|-----------------|
+| Read any channel you're subscribed to | No | Yes |
+| Browse full message history | No | Yes |
+| Search messages across chats | No | Yes |
+| Click inline buttons | No | Yes |
+| Join channels/groups by link | No | Yes |
+| See who posted in channels | No | Yes |
+| Send messages to any user | Limited | Yes |
+| React to messages | No | Yes |
+| Access 900M+ public channels | No | Yes |
+
 ## Features
 
 - **40+ API endpoints** — messages, history, inline buttons, polls, pins, groups, channels, media, contacts, reactions, search
 - **Two interfaces** — REST API (any HTTP client) + MCP server (AI agents like Claude, GPT, etc.)
-- **Real Telegram account** — uses MTProto via Pyrogram, not the limited Bot API
+- **Real Telegram account** — MTProto, not the limited Bot API (see above)
 - **AI agent bridge** — optionally forward incoming messages to an AI backend for automated replies
 - **Lightweight** — single Python process, ~2000 lines, no database
 
