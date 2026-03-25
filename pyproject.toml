@@ -1,6 +1,6 @@
 [project]
 name = "gramgate"
-version = "0.1.0"
+version = "1.0.0"
 description = "Lightweight Telegram gateway — expose your account as REST API and MCP server for AI agents, bots, and automation"
 requires-python = ">=3.10"
 dependencies = [
