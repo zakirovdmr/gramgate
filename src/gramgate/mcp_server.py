@@ -1,5 +1,6 @@
 """GramGate MCP server — exposes Telegram account capabilities as tools."""
 
+import functools
 import json
 import logging
 from typing import TYPE_CHECKING

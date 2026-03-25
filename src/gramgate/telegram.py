@@ -98,9 +98,12 @@ class GramGateTelegram:
         # Private messages (not from self)
         @self.client.on_message(filters.private & ~filters.me)
         async def on_private(client: Client, message: Message):
+            sender = message.from_user.username or message.from_user.id if message.from_user else "?"
+            log.info("MSG private from=%s text=%s", sender, (message.text or "")[:80])
             self._store_message(message)
             if message.chat.id in self._skip_chat_ids:
-                return  # skip — this chat is used for direct API testing
+                log.debug("Skipped (in skip list): chat=%s", message.chat.id)
+                return
             if self.openclaw:
                 await self._handle(message)
 
@@ -109,6 +112,8 @@ class GramGateTelegram:
         async def on_group(client: Client, message: Message):
             self._store_message(message)
             if message.mentioned and self.openclaw:
+                sender = message.from_user.username or message.from_user.id if message.from_user else "?"
+                log.info("MSG mention group=%s from=%s text=%s", message.chat.id, sender, (message.text or "")[:80])
                 await self._handle(message, is_group=True)
 
         # Channel messages — always store
@@ -174,11 +179,13 @@ class GramGateTelegram:
 
             typing_task = asyncio.create_task(self._typing_loop(chat_id))
 
+            log.info("BRIDGE → OpenClaw chat=%s len=%d images=%d files=%d", chat_id, len(text), len(images), len(files))
             response = await self.openclaw.send(
                 text, session_key, images=images or None, files=files or None,
             )
 
             if response:
+                log.info("BRIDGE ← OpenClaw chat=%s response_len=%d", chat_id, len(response))
                 await self._send_reply(chat_id, response, reply_to=message.id)
                 try:
                     await self.client.send_reaction(chat_id, message_id=message.id, emoji=None)
@@ -340,15 +347,18 @@ class GramGateTelegram:
 
     async def click_inline_button(self, chat_id, message_id: int, callback_data: str) -> dict:
         """Click an inline button by its callback_data."""
+        log.info("CLICK chat=%s msg=%d data=%s", chat_id, message_id, callback_data)
         try:
             await self.client.request_callback_answer(chat_id, message_id, callback_data)
             return {"ok": True, "chat_id": chat_id, "message_id": message_id, "callback_data": callback_data}
         except Exception as e:
+            log.error("CLICK failed chat=%s msg=%d: %s", chat_id, message_id, e)
             return {"ok": False, "error": str(e)}
 
     async def send_message_to(self, recipient, text: str) -> dict:
         if isinstance(recipient, str) and recipient.startswith("@"):
             recipient = recipient[1:]
+        log.info("SEND to=%s len=%d", recipient, len(text))
         text = _convert_markdown_for_telegram(text)
         chunks = _split_message(text)
         last = None
@@ -357,6 +367,7 @@ class GramGateTelegram:
         return {"message_id": last.id, "chat_id": last.chat.id}
 
     async def join_chat(self, link: str) -> dict:
+        log.info("JOIN %s", link)
         if link.startswith("@"):
             link = link[1:]
         elif link.startswith("https://t.me/"):
@@ -364,9 +375,11 @@ class GramGateTelegram:
         elif link.startswith("t.me/"):
             link = link.replace("t.me/", "")
         chat = await self.client.join_chat(link)
+        log.info("JOIN ok chat=%s title=%s", chat.id, chat.title)
         return {"chat_id": chat.id, "title": chat.title, "type": str(chat.type)}
 
     async def leave_chat(self, chat_id) -> dict:
+        log.info("LEAVE chat=%s", chat_id)
         await self.client.leave_chat(chat_id)
         return {"left": True}
 
@@ -439,17 +452,20 @@ class GramGateTelegram:
     # ==================== Edit / Delete messages ====================
 
     async def edit_message(self, chat_id, message_id: int, text: str) -> dict:
+        log.info("EDIT chat=%s msg=%d len=%d", chat_id, message_id, len(text))
         text = _convert_markdown_for_telegram(text)
         msg = await self.client.edit_message_text(chat_id, message_id, text, parse_mode=ParseMode.MARKDOWN)
         return {"message_id": msg.id, "chat_id": msg.chat.id}
 
     async def delete_messages(self, chat_id, message_ids: list[int]) -> dict:
+        log.info("DELETE chat=%s msgs=%s", chat_id, message_ids)
         await self.client.delete_messages(chat_id, message_ids)
         return {"deleted": len(message_ids)}
 
     # ==================== Pin / Unpin ====================
 
     async def pin_message(self, chat_id, message_id: int, both_sides: bool = True, disable_notification: bool = False) -> dict:
+        log.info("PIN chat=%s msg=%d", chat_id, message_id)
         await self.client.pin_chat_message(chat_id, message_id, both_sides=both_sides, disable_notification=disable_notification)
         return {"pinned": True, "message_id": message_id}
 
@@ -464,14 +480,17 @@ class GramGateTelegram:
     # ==================== Chat management ====================
 
     async def create_group(self, title: str, users: list) -> dict:
+        log.info("CREATE group title=%s users=%s", title, users)
         chat = await self.client.create_group(title, users)
         return {"chat_id": chat.id, "title": chat.title, "type": str(chat.type)}
 
     async def create_channel(self, title: str, description: str = "") -> dict:
+        log.info("CREATE channel title=%s", title)
         chat = await self.client.create_channel(title, description=description)
         return {"chat_id": chat.id, "title": chat.title, "type": str(chat.type)}
 
     async def create_supergroup(self, title: str, description: str = "") -> dict:
+        log.info("CREATE supergroup title=%s", title)
         chat = await self.client.create_supergroup(title, description=description)
         return {"chat_id": chat.id, "title": chat.title, "type": str(chat.type)}
 
@@ -502,10 +521,12 @@ class GramGateTelegram:
     # ==================== User / Member management ====================
 
     async def ban_chat_member(self, chat_id, user_id: int) -> dict:
+        log.info("BAN chat=%s user=%d", chat_id, user_id)
         await self.client.ban_chat_member(chat_id, user_id)
         return {"banned": True, "user_id": user_id}
 
     async def unban_chat_member(self, chat_id, user_id: int) -> dict:
+        log.info("UNBAN chat=%s user=%d", chat_id, user_id)
         await self.client.unban_chat_member(chat_id, user_id)
         return {"unbanned": True, "user_id": user_id}
 

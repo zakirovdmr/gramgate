@@ -1,6 +1,7 @@
 """GramGate HTTP REST API — simple JSON endpoints for Telegram account actions."""
 
 import logging
+import time
 import traceback
 from typing import TYPE_CHECKING
 
@@ -51,14 +52,20 @@ async def _json_body(request: Request) -> dict:
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        start = time.monotonic()
         try:
-            return await call_next(request)
+            response = await call_next(request)
+            elapsed = (time.monotonic() - start) * 1000
+            if request.url.path != "/health":
+                log.debug("%s %s → %d (%.0fms)", request.method, request.url.path, response.status_code, elapsed)
+            return response
         except ValueError as e:
+            log.warning("%s %s → 400: %s", request.method, request.url.path, e)
             return JSONResponse({"error": str(e)}, status_code=400)
         except RuntimeError as e:
             return JSONResponse({"error": str(e)}, status_code=503)
         except Exception as e:
-            log.error("Unhandled error: %s\n%s", e, traceback.format_exc())
+            log.error("%s %s → 500: %s\n%s", request.method, request.url.path, e, traceback.format_exc())
             return JSONResponse({"error": str(e)}, status_code=500)
 
 
@@ -70,6 +77,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         auth = request.headers.get("authorization", "")
         if auth != f"Bearer {_api_token}":
+            log.warning("AUTH 401 %s %s", request.method, request.url.path)
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         return await call_next(request)
 
@@ -102,6 +110,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 pass
             ok, retry = _rate_limiter.check_send(chat_key)
             if not ok:
+                log.warning("RATE 429 send %s chat=%s retry=%.0fs", path, chat_key, retry)
                 return JSONResponse(
                     {"error": "rate limit exceeded", "retry_after": round(retry, 1)},
                     status_code=429,
@@ -110,6 +119,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         elif path in JOIN_ACTIONS:
             ok, retry = _rate_limiter.check_join()
             if not ok:
+                log.warning("RATE 429 join %s retry=%.0fs", path, retry)
                 return JSONResponse(
                     {"error": "rate limit exceeded", "retry_after": round(retry, 1)},
                     status_code=429,
@@ -119,6 +129,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Global API rate
         ok, retry = _rate_limiter.check_api()
         if not ok:
+            log.warning("RATE 429 global retry=%.0fs", retry)
             return JSONResponse(
                 {"error": "rate limit exceeded", "retry_after": round(retry, 1)},
                 status_code=429,
