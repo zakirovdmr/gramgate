@@ -281,4 +281,4 @@ MIT
 
 ---
 
-Built by [Damir Zakirov](https://github.com/zakirovdmr) with [Claude Code](https://claude.ai/code) by Anthropic
+Built by [Damir Zakirov](https://github.com/zakirovdmr) with Claude Code
