@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     api_token: str = Field(default="", alias="LANDO_API_TOKEN")
     api_host: str = Field(default="127.0.0.1", alias="LANDO_API_HOST")
 
+    # MCP server (0 = disabled)
+    mcp_port: int = Field(default=18792, alias="LANDO_MCP_PORT")
+
     # Rate limits (0 = disabled, values are max requests per window)
     rate_send_per_chat: int = Field(default=20, alias="LANDO_RATE_SEND_PER_CHAT")  # per 60s
     rate_send_global: int = Field(default=30, alias="LANDO_RATE_SEND_GLOBAL")  # per 60s

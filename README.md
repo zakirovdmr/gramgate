@@ -154,7 +154,43 @@ Without it, Lando works as a pure gateway — API and MCP tools only, no auto-re
 
 ## MCP Server
 
-Lando includes a built-in MCP (Model Context Protocol) server with all Telegram capabilities exposed as tools. This lets AI agents like Claude interact with Telegram natively.
+Lando runs a built-in MCP (Model Context Protocol) server on port `18792` (configurable via `LANDO_MCP_PORT`). It exposes 51 Telegram tools that any MCP-compatible agent can use natively.
+
+### Connect from Claude Desktop / Claude Code
+
+Add to your MCP config (`claude_desktop_config.json` or `.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "lando-telegram": {
+      "url": "http://127.0.0.1:18792/sse"
+    }
+  }
+}
+```
+
+Set `LANDO_MCP_PORT=0` to disable the MCP server.
+
+## Use with OpenClaw
+
+Lando ships with a ready-made OpenClaw skill in `extras/openclaw/`.
+
+### Quick install
+
+```bash
+# From the Lando repo directory:
+./extras/openclaw/install.sh
+
+# Or manually:
+cp -r extras/openclaw/SKILL.md ~/.openclaw/skills/lando-telegram/SKILL.md
+```
+
+Restart the OpenClaw gateway after installing. The agent will be able to call Lando's REST API endpoints via `curl` commands described in the skill.
+
+### OpenClaw bridge mode
+
+Optionally, set `OPENCLAW_TOKEN` in `.env` to enable two-way integration: incoming Telegram messages are forwarded to OpenClaw, and AI responses are sent back to the chat automatically.
 
 ## Rate Limiting
 

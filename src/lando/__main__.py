@@ -14,6 +14,7 @@ from pyrogram import idle
 
 from .api import create_app, set_telegram as api_set_tg
 from .config import Settings
+from .mcp_server import mcp as mcp_server, set_telegram as mcp_set_tg
 from .telegram import LandoTelegram
 
 logging.basicConfig(
@@ -39,8 +40,9 @@ async def run():
 
     tg = LandoTelegram(config, openclaw)
 
-    # Wire API to Telegram client
+    # Wire Telegram client to API and MCP
     api_set_tg(tg)
+    mcp_set_tg(tg)
 
     # Start Pyrogram
     await tg.start()
@@ -64,6 +66,14 @@ async def run():
     uv_config = uvicorn.Config(app, host=config.api_host, port=config.api_port, log_level="warning")
     uv_server = uvicorn.Server(uv_config)
     asyncio.create_task(uv_server.serve())
+    # Start MCP server (SSE transport)
+    if config.mcp_port:
+        mcp_app = mcp_server.sse_app()
+        mcp_uv_config = uvicorn.Config(mcp_app, host=config.api_host, port=config.mcp_port, log_level="warning")
+        mcp_uv_server = uvicorn.Server(mcp_uv_config)
+        asyncio.create_task(mcp_uv_server.serve())
+        log.info("MCP server (SSE) on http://%s:%d/sse", config.api_host, config.mcp_port)
+
     log.info(
         "Lando started — phone %s, REST API on http://%s:%d",
         config.telegram_phone, config.api_host, config.api_port,
