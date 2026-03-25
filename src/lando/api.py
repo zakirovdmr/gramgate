@@ -75,6 +75,25 @@ async def get_chat_members(request: Request) -> JSONResponse:
     return JSONResponse(await tg.get_chat_members(cid, limit))
 
 
+async def get_chat_history_rich(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    limit = int(body.get("limit", 30))
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.get_chat_history_rich(cid, limit))
+
+
+async def click_inline_button(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = body.get("chat_id", "")
+    message_id = int(body.get("message_id", 0))
+    callback_data = body.get("callback_data", "")
+    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    return JSONResponse(await tg.click_inline_button(cid, message_id, callback_data))
+
+
 async def send_message(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
@@ -535,6 +554,19 @@ async def set_typing(request: Request) -> JSONResponse:
 # ==================== Health ====================
 
 
+async def skip_chat(request: Request) -> JSONResponse:
+    """Add/remove chat_id from the OpenClaw bridge skip list."""
+    tg = _require_tg()
+    body = await _json_body(request)
+    chat_id = int(body.get("chat_id", 0))
+    action = body.get("action", "add")  # "add" or "remove"
+    if action == "remove":
+        tg._skip_chat_ids.discard(chat_id)
+    else:
+        tg._skip_chat_ids.add(chat_id)
+    return JSONResponse({"ok": True, "skip_chat_ids": list(tg._skip_chat_ids)})
+
+
 async def health(request: Request) -> JSONResponse:
     tg = _require_tg()
     return JSONResponse({"status": "ok", "running": tg._running})
@@ -547,6 +579,7 @@ def create_app() -> Starlette:
     return Starlette(
         routes=[
             Route("/health", health, methods=["GET"]),
+            Route("/api/chat/skip", skip_chat, methods=["POST"]),
             # Account
             Route("/api/me", get_me, methods=["GET"]),
             Route("/api/contacts", get_contacts, methods=["GET"]),
@@ -556,6 +589,8 @@ def create_app() -> Starlette:
             Route("/api/dialogs", get_dialogs, methods=["GET"]),
             Route("/api/chat/info", get_chat_info, methods=["POST"]),
             Route("/api/chat/history", get_chat_history, methods=["POST"]),
+            Route("/api/chat/history/rich", get_chat_history_rich, methods=["POST"]),
+            Route("/api/button/click", click_inline_button, methods=["POST"]),
             Route("/api/chat/members", get_chat_members, methods=["POST"]),
             Route("/api/chat/join", join_chat, methods=["POST"]),
             Route("/api/chat/leave", leave_chat, methods=["POST"]),

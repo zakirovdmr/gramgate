@@ -93,9 +93,14 @@ class LandoTelegram:
             workdir=str(session_dir),
         )
 
+        # Chat IDs to skip (bots we test via API, not OpenClaw bridge)
+        self._skip_chat_ids: set[int] = set()
+
         # Private messages (not from self)
         @self.client.on_message(filters.private & ~filters.me)
         async def on_private(client: Client, message: Message):
+            if message.chat.id in self._skip_chat_ids:
+                return  # skip — this chat is used for direct API testing
             await self._handle(message)
 
         # Group messages — respond when mentioned, always store
@@ -300,6 +305,40 @@ class LandoTelegram:
             "members_count": getattr(chat, "members_count", None),
             "description": getattr(chat, "description", None),
         }
+
+    async def get_chat_history_rich(self, chat_id, limit: int = 30) -> list[dict]:
+        """Chat history with inline button data included."""
+        result = []
+        async for msg in self.client.get_chat_history(chat_id, limit=limit):
+            entry = {
+                "id": msg.id,
+                "from": msg.from_user.username if msg.from_user else None,
+                "text": msg.text or msg.caption or "",
+                "date": msg.date.isoformat() if msg.date else None,
+                "has_media": bool(_media_type(msg)),
+                "media_type": _media_type(msg),
+            }
+            # Extract inline keyboard buttons
+            if msg.reply_markup and hasattr(msg.reply_markup, "inline_keyboard"):
+                buttons = []
+                for row in msg.reply_markup.inline_keyboard:
+                    for btn in row:
+                        buttons.append({
+                            "text": btn.text,
+                            "callback_data": btn.callback_data,
+                            "url": btn.url,
+                        })
+                entry["buttons"] = buttons
+            result.append(entry)
+        return result
+
+    async def click_inline_button(self, chat_id, message_id: int, callback_data: str) -> dict:
+        """Click an inline button by its callback_data."""
+        try:
+            await self.client.request_callback_answer(chat_id, message_id, callback_data)
+            return {"ok": True, "chat_id": chat_id, "message_id": message_id, "callback_data": callback_data}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     async def send_message_to(self, recipient, text: str) -> dict:
         if isinstance(recipient, str) and recipient.startswith("@"):
