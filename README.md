@@ -1,8 +1,34 @@
 # Lando
 
-Lightweight Telegram gateway that exposes your account as a **REST API** and **MCP server**.
+**Telegram gateway for AI agents and automation**
 
-Give any HTTP client, AI agent, or automation tool full programmatic access to Telegram — send messages, read history, click inline buttons, manage groups, and more.
+<p>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-green.svg?style=for-the-badge" alt="MCP Compatible"></a>
+</p>
+
+Give any HTTP client, AI agent, or automation tool full programmatic access to a real Telegram account — read channels, send messages, click inline buttons, manage groups, monitor news feeds, and more.
+
+```
+Telegram (MTProto)
+       │
+       ▼
+┌─────────────┐
+│    Lando    │  ← single Python process
+│  (Pyrogram) │
+└──────┬──────┘
+       │
+  ┌────┴────┐
+  │         │
+  ▼         ▼
+REST API   MCP Server
+ :18791     :18793
+  │         │
+  ▼         ▼
+Any HTTP   Claude, GPT,
+ client    AI agents
+```
 
 ## Why not the Bot API?
 
