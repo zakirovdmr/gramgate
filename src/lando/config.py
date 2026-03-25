@@ -13,13 +13,18 @@ class Settings(BaseSettings):
     telegram_phone: str = Field(..., alias="TELEGRAM_PHONE")
     telegram_session_dir: str = Field(default="./sessions", alias="TELEGRAM_SESSION_DIR")
 
-    # OpenClaw
+    # API
+    api_port: int = Field(default=18791, alias="LANDO_API_PORT")
+    api_token: str = Field(default="", alias="LANDO_API_TOKEN")
+    api_host: str = Field(default="127.0.0.1", alias="LANDO_API_HOST")
+
+    # OpenClaw (optional — bridge disabled if token is empty)
     openclaw_url: str = Field(default="http://127.0.0.1:18789", alias="OPENCLAW_URL")
-    openclaw_token: str = Field(..., alias="OPENCLAW_TOKEN")
+    openclaw_token: str = Field(default="", alias="OPENCLAW_TOKEN")
     openclaw_model: str = Field(default="openclaw", alias="OPENCLAW_MODEL")
 
     model_config = {
-        "env_file": ["/root/lando/.env", ".env"],
+        "env_file": ".env",
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

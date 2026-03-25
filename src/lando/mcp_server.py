@@ -13,6 +13,13 @@ log = logging.getLogger("lando.mcp")
 
 mcp = FastMCP("lando-telegram")
 
+
+def _parse_id(value: str) -> int | str:
+    """Parse ID — numeric string to int, otherwise keep as string."""
+    if value.lstrip("-").isdigit():
+        return int(value)
+    return value
+
 # Reference to the running LandoTelegram instance (set at startup)
 _tg: "LandoTelegram | None" = None
 
@@ -54,7 +61,7 @@ async def telegram_get_chat_info(chat_id: str) -> str:
     """Get detailed info about a chat/channel/user.
     chat_id can be numeric ID or @username."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.get_chat_info(cid), ensure_ascii=False)
 
 
@@ -63,7 +70,7 @@ async def telegram_get_chat_history(chat_id: str, limit: int = 30) -> str:
     """Read recent messages from any chat, group, or channel.
     chat_id can be numeric ID or @username. Returns up to `limit` messages."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.get_chat_history(cid, limit), ensure_ascii=False)
 
 
@@ -71,7 +78,7 @@ async def telegram_get_chat_history(chat_id: str, limit: int = 30) -> str:
 async def telegram_get_chat_members(chat_id: str, limit: int = 50) -> str:
     """Get members of a group or channel. Returns user_id, username, first_name, status."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.get_chat_members(cid, limit), ensure_ascii=False)
 
 
@@ -87,7 +94,7 @@ async def telegram_join_chat(link: str) -> str:
 async def telegram_leave_chat(chat_id: str) -> str:
     """Leave a channel or group."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.leave_chat(cid), ensure_ascii=False)
 
 
@@ -100,7 +107,7 @@ async def telegram_send_message(recipient: str, text: str) -> str:
     recipient can be @username, phone number, or numeric chat_id.
     Long messages are automatically split into 4096-char chunks."""
     tg = _require_tg()
-    rcpt = int(recipient) if recipient.lstrip("-").isdigit() else recipient
+    rcpt = _parse_id(recipient)
     return json.dumps(await tg.send_message_to(rcpt, text), ensure_ascii=False)
 
 
@@ -108,7 +115,7 @@ async def telegram_send_message(recipient: str, text: str) -> str:
 async def telegram_search_messages(chat_id: str, query: str, limit: int = 20) -> str:
     """Search messages in a specific chat by text query."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.search_messages(cid, query, limit), ensure_ascii=False)
 
 
@@ -126,8 +133,8 @@ async def telegram_forward_messages(
     """Forward messages from one chat to another.
     message_ids: comma-separated list of message IDs (e.g. "123,456,789")."""
     tg = _require_tg()
-    to_cid = int(to_chat_id) if to_chat_id.lstrip("-").isdigit() else to_chat_id
-    from_cid = int(from_chat_id) if from_chat_id.lstrip("-").isdigit() else from_chat_id
+    to_cid = _parse_id(to_chat_id)
+    from_cid = _parse_id(from_chat_id)
     ids = [int(x.strip()) for x in message_ids.split(",")]
     return json.dumps(await tg.forward_messages(to_cid, from_cid, ids), ensure_ascii=False)
 
@@ -136,7 +143,7 @@ async def telegram_forward_messages(
 async def telegram_send_reaction(chat_id: str, message_id: int, emoji: str = "\U0001f44d") -> str:
     """React to a message with an emoji (e.g. "👍", "❤️", "🔥")."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.send_reaction(cid, message_id, emoji), ensure_ascii=False)
 
 
@@ -144,7 +151,7 @@ async def telegram_send_reaction(chat_id: str, message_id: int, emoji: str = "\U
 async def telegram_mark_read(chat_id: str) -> str:
     """Mark all messages in a chat as read."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.read_chat(cid), ensure_ascii=False)
 
 
@@ -193,7 +200,7 @@ async def telegram_get_chat_feed(chat_id: str, limit: int = 50) -> str:
     """Get stored messages from a specific channel/group (from live monitoring buffer).
     Only contains messages received while Lando is running."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     messages = tg.store.get_chat_feed(cid, limit)
     return json.dumps(
         [
@@ -227,7 +234,7 @@ async def telegram_edit_message(chat_id: str, message_id: int, text: str) -> str
     """Edit a previously sent message. Only your own messages can be edited.
     chat_id can be numeric ID or @username."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.edit_message(cid, message_id, text), ensure_ascii=False)
 
 
@@ -237,7 +244,7 @@ async def telegram_delete_messages(chat_id: str, message_ids: str) -> str:
     message_ids: comma-separated IDs (e.g. "123,456").
     In private chats, deletes for both sides. In groups, needs admin rights for others' messages."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     ids = [int(x.strip()) for x in message_ids.split(",")]
     return json.dumps(await tg.delete_messages(cid, ids), ensure_ascii=False)
 
@@ -249,7 +256,7 @@ async def telegram_delete_messages(chat_id: str, message_ids: str) -> str:
 async def telegram_pin_message(chat_id: str, message_id: int, disable_notification: bool = False) -> str:
     """Pin a message in a chat. Requires admin rights in groups/channels."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.pin_message(cid, message_id, disable_notification=disable_notification), ensure_ascii=False)
 
 
@@ -257,7 +264,7 @@ async def telegram_pin_message(chat_id: str, message_id: int, disable_notificati
 async def telegram_unpin_message(chat_id: str, message_id: int = 0) -> str:
     """Unpin a specific message (by message_id) or the most recent pinned message (if message_id=0)."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.unpin_message(cid, message_id), ensure_ascii=False)
 
 
@@ -265,7 +272,7 @@ async def telegram_unpin_message(chat_id: str, message_id: int = 0) -> str:
 async def telegram_unpin_all_messages(chat_id: str) -> str:
     """Unpin ALL pinned messages in a chat."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.unpin_all_messages(cid), ensure_ascii=False)
 
 
@@ -280,7 +287,7 @@ async def telegram_create_group(title: str, users: str) -> str:
     user_list = []
     for u in users.split(","):
         u = u.strip()
-        user_list.append(int(u) if u.lstrip("-").isdigit() else u)
+        user_list.append(_parse_id(u))
     return json.dumps(await tg.create_group(title, user_list), ensure_ascii=False)
 
 
@@ -302,7 +309,7 @@ async def telegram_create_supergroup(title: str, description: str = "") -> str:
 async def telegram_set_chat_title(chat_id: str, title: str) -> str:
     """Change the title of a group or channel. Requires admin rights."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.set_chat_title(cid, title), ensure_ascii=False)
 
 
@@ -310,7 +317,7 @@ async def telegram_set_chat_title(chat_id: str, title: str) -> str:
 async def telegram_set_chat_description(chat_id: str, description: str) -> str:
     """Change the description of a group or channel. Requires admin rights."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.set_chat_description(cid, description), ensure_ascii=False)
 
 
@@ -318,7 +325,7 @@ async def telegram_set_chat_description(chat_id: str, description: str) -> str:
 async def telegram_delete_chat_photo(chat_id: str) -> str:
     """Remove the photo of a group or channel. Requires admin rights."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.delete_chat_photo(cid), ensure_ascii=False)
 
 
@@ -342,7 +349,7 @@ async def telegram_unarchive_chats(chat_ids: str) -> str:
 async def telegram_export_chat_invite_link(chat_id: str) -> str:
     """Export (regenerate) the primary invite link for a chat. Requires admin rights."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.export_chat_invite_link(cid), ensure_ascii=False)
 
 
@@ -352,7 +359,7 @@ async def telegram_create_chat_invite_link(chat_id: str, name: str = "", expire_
     expire_date: Unix timestamp when the link expires (0 = no expiry).
     member_limit: max joins via this link (0 = unlimited)."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.create_chat_invite_link(cid, name, expire_date or None, member_limit), ensure_ascii=False)
 
 
@@ -363,7 +370,7 @@ async def telegram_create_chat_invite_link(chat_id: str, name: str = "", expire_
 async def telegram_ban_chat_member(chat_id: str, user_id: int) -> str:
     """Ban a user from a group or channel. Requires admin rights with ban permission."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.ban_chat_member(cid, user_id), ensure_ascii=False)
 
 
@@ -371,7 +378,7 @@ async def telegram_ban_chat_member(chat_id: str, user_id: int) -> str:
 async def telegram_unban_chat_member(chat_id: str, user_id: int) -> str:
     """Unban a previously banned user from a group or channel."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.unban_chat_member(cid, user_id), ensure_ascii=False)
 
 
@@ -381,7 +388,7 @@ async def telegram_restrict_chat_member(chat_id: str, user_id: int, permissions:
     permissions: JSON object with ChatPermissions fields, e.g.
     '{"can_send_messages": false, "can_send_media_messages": false}'"""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     perms = json.loads(permissions)
     return json.dumps(await tg.restrict_chat_member(cid, user_id, perms), ensure_ascii=False)
 
@@ -392,7 +399,7 @@ async def telegram_promote_chat_member(chat_id: str, user_id: int, privileges: s
     privileges: JSON object with ChatPrivileges fields, e.g.
     '{"can_manage_chat": true, "can_delete_messages": true, "can_pin_messages": true}'"""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     privs = json.loads(privileges)
     return json.dumps(await tg.promote_chat_member(cid, user_id, privs), ensure_ascii=False)
 
@@ -401,11 +408,11 @@ async def telegram_promote_chat_member(chat_id: str, user_id: int, privileges: s
 async def telegram_add_chat_members(chat_id: str, user_ids: str) -> str:
     """Add users to a group. user_ids: comma-separated IDs or @usernames."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     users = []
     for u in user_ids.split(","):
         u = u.strip()
-        users.append(int(u) if u.lstrip("-").isdigit() else u)
+        users.append(_parse_id(u))
     return json.dumps(await tg.add_chat_members(cid, users), ensure_ascii=False)
 
 
@@ -432,7 +439,7 @@ async def telegram_get_users(user_ids: str) -> str:
     users = []
     for u in user_ids.split(","):
         u = u.strip()
-        users.append(int(u) if u.lstrip("-").isdigit() else u)
+        users.append(_parse_id(u))
     return json.dumps(await tg.get_users(users), ensure_ascii=False)
 
 
@@ -440,7 +447,7 @@ async def telegram_get_users(user_ids: str) -> str:
 async def telegram_get_profile_photos(chat_id: str, limit: int = 10) -> str:
     """Get profile photos of a user or chat. Returns file_id, date, file_size."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.get_profile_photos(cid, limit), ensure_ascii=False)
 
 
@@ -453,7 +460,7 @@ async def telegram_send_poll(chat_id: str, question: str, options: str, is_anony
     options: comma-separated poll options (e.g. "Yes,No,Maybe").
     poll_type: "regular" or "quiz". For quiz, first option is the correct answer."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     opts = [o.strip() for o in options.split(",")]
     return json.dumps(await tg.send_poll(cid, question, opts, is_anonymous, poll_type, allows_multiple_answers), ensure_ascii=False)
 
@@ -462,7 +469,7 @@ async def telegram_send_poll(chat_id: str, question: str, options: str, is_anony
 async def telegram_stop_poll(chat_id: str, message_id: int) -> str:
     """Stop a running poll and get final results."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.stop_poll(cid, message_id), ensure_ascii=False)
 
 
@@ -470,7 +477,7 @@ async def telegram_stop_poll(chat_id: str, message_id: int) -> str:
 async def telegram_vote_poll(chat_id: str, message_id: int, option_ids: str) -> str:
     """Vote in a poll. option_ids: comma-separated 0-based indices (e.g. "0" or "0,2")."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     ids = [int(x.strip()) for x in option_ids.split(",")]
     return json.dumps(await tg.vote_poll(cid, message_id, ids), ensure_ascii=False)
 
@@ -482,8 +489,8 @@ async def telegram_vote_poll(chat_id: str, message_id: int, option_ids: str) -> 
 async def telegram_copy_message(to_chat_id: str, from_chat_id: str, message_id: int) -> str:
     """Copy a message to another chat without the 'Forwarded from' header."""
     tg = _require_tg()
-    to_cid = int(to_chat_id) if to_chat_id.lstrip("-").isdigit() else to_chat_id
-    from_cid = int(from_chat_id) if from_chat_id.lstrip("-").isdigit() else from_chat_id
+    to_cid = _parse_id(to_chat_id)
+    from_cid = _parse_id(from_chat_id)
     return json.dumps(await tg.copy_message(to_cid, from_cid, message_id), ensure_ascii=False)
 
 
@@ -492,7 +499,7 @@ async def telegram_send_scheduled_message(chat_id: str, text: str, schedule_date
     """Send a message that will be delivered at a specified time.
     schedule_date: Unix timestamp of the delivery time (must be in the future)."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.send_scheduled_message(cid, text, schedule_date), ensure_ascii=False)
 
 
@@ -502,7 +509,7 @@ async def telegram_get_messages(chat_id: str, message_ids: str) -> str:
     message_ids: comma-separated (e.g. "123,456").
     Returns full message info including text, media, views, forwards."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     ids = [int(x.strip()) for x in message_ids.split(",")]
     return json.dumps(await tg.get_messages(cid, ids), ensure_ascii=False)
 
@@ -515,7 +522,7 @@ async def telegram_download_media(chat_id: str, message_id: int) -> str:
     """Download media from a specific message and return it as base64.
     Useful for processing images, audio, documents from any chat."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.download_media(cid, message_id), ensure_ascii=False)
 
 
@@ -526,7 +533,7 @@ async def telegram_download_media(chat_id: str, message_id: int) -> str:
 async def telegram_send_location(chat_id: str, latitude: float, longitude: float) -> str:
     """Send a location pin to a chat."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.send_location(cid, latitude, longitude), ensure_ascii=False)
 
 
@@ -534,7 +541,7 @@ async def telegram_send_location(chat_id: str, latitude: float, longitude: float
 async def telegram_send_contact(chat_id: str, phone_number: str, first_name: str, last_name: str = "") -> str:
     """Send a contact card to a chat."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.send_contact(cid, phone_number, first_name, last_name), ensure_ascii=False)
 
 
@@ -546,5 +553,5 @@ async def telegram_set_typing(chat_id: str, action: str = "typing") -> str:
     """Send a chat action indicator (typing, uploading, recording, etc.).
     action: typing, upload_photo, upload_video, upload_document, record_video, record_audio, choose_sticker, cancel."""
     tg = _require_tg()
-    cid = int(chat_id) if chat_id.lstrip("-").isdigit() else chat_id
+    cid = _parse_id(chat_id)
     return json.dumps(await tg.set_typing(cid, action), ensure_ascii=False)

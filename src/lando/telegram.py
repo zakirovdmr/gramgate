@@ -12,7 +12,6 @@ from pyrogram import Client, filters
 from pyrogram.enums import ChatAction, ParseMode
 from pyrogram.types import Message
 
-from .openclaw import OpenClawClient
 from .store import MessageStore, StoredMessage
 
 log = logging.getLogger("lando.telegram")
@@ -71,7 +70,7 @@ class LandoTelegram:
     """Pyrogram MTProto client that forwards messages to OpenClaw
     and exposes full account capabilities via MCP tools."""
 
-    def __init__(self, config, openclaw: OpenClawClient):
+    def __init__(self, config, openclaw=None):
         self.config = config
         self.openclaw = openclaw
         self.client: Optional[Client] = None
@@ -99,15 +98,17 @@ class LandoTelegram:
         # Private messages (not from self)
         @self.client.on_message(filters.private & ~filters.me)
         async def on_private(client: Client, message: Message):
+            self._store_message(message)
             if message.chat.id in self._skip_chat_ids:
                 return  # skip — this chat is used for direct API testing
-            await self._handle(message)
+            if self.openclaw:
+                await self._handle(message)
 
         # Group messages — respond when mentioned, always store
         @self.client.on_message(filters.group & ~filters.me)
         async def on_group(client: Client, message: Message):
             self._store_message(message)
-            if message.mentioned:
+            if message.mentioned and self.openclaw:
                 await self._handle(message, is_group=True)
 
         # Channel messages — always store
@@ -377,12 +378,20 @@ class LandoTelegram:
 
     async def search_global(self, query: str, limit: int = 10) -> list[dict]:
         result = []
-        async for chat in self.client.search_global(query, limit=limit):
+        seen_chats: set[int] = set()
+        async for msg in self.client.search_global(query, limit=limit):
+            chat = msg.chat
+            if chat.id in seen_chats:
+                continue
+            seen_chats.add(chat.id)
             result.append({
-                "id": chat.id,
+                "chat_id": chat.id,
                 "title": getattr(chat, "title", None) or getattr(chat, "first_name", "?"),
                 "username": chat.username,
                 "type": str(chat.type),
+                "message_id": msg.id,
+                "text": (msg.text or msg.caption or "")[:200],
+                "date": msg.date.isoformat() if msg.date else None,
             })
         return result
 
@@ -685,11 +694,6 @@ class LandoTelegram:
         act = actions_map.get(action, ChatAction.TYPING)
         await self.client.send_chat_action(chat_id, act)
         return {"ok": True, "action": action}
-
-    async def delete_account(self, reason: str = "") -> dict:
-        """DANGEROUS: permanently deletes the Telegram account."""
-        await self.client.delete_account(reason=reason)
-        return {"deleted": True}
 
     async def stop(self):
         if self.client and self._running:

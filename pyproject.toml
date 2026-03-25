@@ -1,13 +1,14 @@
 [project]
 name = "lando"
 version = "0.1.0"
-description = "Lando - MTProto bridge for OpenClaw"
+description = "Lightweight Telegram gateway — expose your account as REST API and MCP server for AI agents, bots, and automation"
 requires-python = ">=3.10"
 dependencies = [
     "pyrofork>=2.3",
     "tgcrypto>=1.2",
     "httpx>=0.28",
     "pydantic-settings>=2.0",
+    "starlette>=0.37",
     "mcp>=1.0",
     "uvicorn>=0.30",
 ]

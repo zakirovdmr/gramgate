@@ -1,10 +1,12 @@
 """Lando HTTP REST API — simple JSON endpoints for Telegram account actions."""
 
-import json
 import logging
+import traceback
 from typing import TYPE_CHECKING
 
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -15,6 +17,7 @@ if TYPE_CHECKING:
 log = logging.getLogger("lando.api")
 
 _tg: "LandoTelegram | None" = None
+_api_token: str = ""
 
 
 def set_telegram(tg: "LandoTelegram"):
@@ -28,11 +31,47 @@ def _require_tg() -> "LandoTelegram":
     return _tg
 
 
+def _parse_chat_id(value) -> int | str:
+    """Parse chat_id from request — numeric string to int, otherwise keep as string."""
+    s = str(value)
+    if s.lstrip("-").isdigit():
+        return int(s)
+    return s
+
+
 async def _json_body(request: Request) -> dict:
+    body = await request.body()
+    if not body:
+        return {}
     try:
         return await request.json()
     except Exception:
-        return {}
+        raise ValueError("Invalid JSON body")
+
+
+class ErrorHandlerMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        try:
+            return await call_next(request)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        except RuntimeError as e:
+            return JSONResponse({"error": str(e)}, status_code=503)
+        except Exception as e:
+            log.error("Unhandled error: %s\n%s", e, traceback.format_exc())
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if not _api_token:
+            return await call_next(request)
+        if request.url.path == "/health":
+            return await call_next(request)
+        auth = request.headers.get("authorization", "")
+        if auth != f"Bearer {_api_token}":
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
 
 
 # ==================== Endpoints ====================
@@ -53,7 +92,7 @@ async def get_chat_info(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.get_chat_info(cid))
 
 
@@ -62,7 +101,7 @@ async def get_chat_history(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     limit = int(body.get("limit", 30))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.get_chat_history(cid, limit))
 
 
@@ -71,7 +110,7 @@ async def get_chat_members(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     limit = int(body.get("limit", 50))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.get_chat_members(cid, limit))
 
 
@@ -80,7 +119,7 @@ async def get_chat_history_rich(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     limit = int(body.get("limit", 30))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.get_chat_history_rich(cid, limit))
 
 
@@ -90,7 +129,7 @@ async def click_inline_button(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
     callback_data = body.get("callback_data", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.click_inline_button(cid, message_id, callback_data))
 
 
@@ -99,7 +138,7 @@ async def send_message(request: Request) -> JSONResponse:
     body = await _json_body(request)
     recipient = body.get("recipient", "")
     text = body.get("text", "")
-    rcpt = int(recipient) if str(recipient).lstrip("-").isdigit() else recipient
+    rcpt = _parse_chat_id(recipient)
     return JSONResponse(await tg.send_message_to(rcpt, text))
 
 
@@ -114,7 +153,7 @@ async def leave_chat(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.leave_chat(cid))
 
 
@@ -124,7 +163,7 @@ async def search_messages(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     query = body.get("query", "")
     limit = int(body.get("limit", 20))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.search_messages(cid, query, limit))
 
 
@@ -142,8 +181,8 @@ async def forward_messages(request: Request) -> JSONResponse:
     to_id = body.get("to_chat_id", "")
     from_id = body.get("from_chat_id", "")
     msg_ids = body.get("message_ids", [])
-    to_cid = int(to_id) if str(to_id).lstrip("-").isdigit() else to_id
-    from_cid = int(from_id) if str(from_id).lstrip("-").isdigit() else from_id
+    to_cid = _parse_chat_id(to_id)
+    from_cid = _parse_chat_id(from_id)
     return JSONResponse(await tg.forward_messages(to_cid, from_cid, msg_ids))
 
 
@@ -153,7 +192,7 @@ async def send_reaction(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
     emoji = body.get("emoji", "\U0001f44d")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.send_reaction(cid, message_id, emoji))
 
 
@@ -161,7 +200,7 @@ async def mark_read(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.read_chat(cid))
 
 
@@ -197,7 +236,7 @@ async def get_chat_feed(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     limit = int(body.get("limit", 50))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else int(chat_id)
+    cid = _parse_chat_id(chat_id)
     messages = tg.store.get_chat_feed(cid, limit)
     return JSONResponse([
         {
@@ -229,7 +268,7 @@ async def edit_message(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
     text = body.get("text", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.edit_message(cid, message_id, text))
 
 
@@ -238,7 +277,7 @@ async def delete_messages(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     message_ids = body.get("message_ids", [])
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.delete_messages(cid, message_ids))
 
 
@@ -251,7 +290,7 @@ async def pin_message(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
     disable_notification = body.get("disable_notification", False)
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.pin_message(cid, message_id, disable_notification=disable_notification))
 
 
@@ -260,7 +299,7 @@ async def unpin_message(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.unpin_message(cid, message_id))
 
 
@@ -268,7 +307,7 @@ async def unpin_all_messages(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.unpin_all_messages(cid))
 
 
@@ -304,7 +343,7 @@ async def set_chat_title(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     title = body.get("title", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.set_chat_title(cid, title))
 
 
@@ -313,7 +352,7 @@ async def set_chat_description(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     description = body.get("description", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.set_chat_description(cid, description))
 
 
@@ -321,7 +360,7 @@ async def delete_chat_photo(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.delete_chat_photo(cid))
 
 
@@ -343,7 +382,7 @@ async def export_chat_invite_link(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.export_chat_invite_link(cid))
 
 
@@ -354,7 +393,7 @@ async def create_chat_invite_link(request: Request) -> JSONResponse:
     name = body.get("name", "")
     expire_date = body.get("expire_date")
     member_limit = int(body.get("member_limit", 0))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.create_chat_invite_link(cid, name, expire_date, member_limit))
 
 
@@ -366,7 +405,7 @@ async def ban_chat_member(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     user_id = int(body.get("user_id", 0))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.ban_chat_member(cid, user_id))
 
 
@@ -375,7 +414,7 @@ async def unban_chat_member(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     user_id = int(body.get("user_id", 0))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.unban_chat_member(cid, user_id))
 
 
@@ -385,7 +424,7 @@ async def restrict_chat_member(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     user_id = int(body.get("user_id", 0))
     permissions = body.get("permissions", {})
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.restrict_chat_member(cid, user_id, permissions))
 
 
@@ -395,7 +434,7 @@ async def promote_chat_member(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     user_id = int(body.get("user_id", 0))
     privileges = body.get("privileges", {})
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.promote_chat_member(cid, user_id, privileges))
 
 
@@ -404,7 +443,7 @@ async def add_chat_members(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     user_ids = body.get("user_ids", [])
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.add_chat_members(cid, user_ids))
 
 
@@ -434,7 +473,7 @@ async def get_profile_photos(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     limit = int(body.get("limit", 10))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.get_profile_photos(cid, limit))
 
 
@@ -450,7 +489,7 @@ async def send_poll(request: Request) -> JSONResponse:
     is_anonymous = body.get("is_anonymous", True)
     poll_type = body.get("poll_type", "regular")
     allows_multiple = body.get("allows_multiple_answers", False)
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.send_poll(cid, question, options, is_anonymous, poll_type, allows_multiple))
 
 
@@ -459,7 +498,7 @@ async def stop_poll(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.stop_poll(cid, message_id))
 
 
@@ -469,7 +508,7 @@ async def vote_poll(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
     option_ids = body.get("option_ids", [])
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.vote_poll(cid, message_id, option_ids))
 
 
@@ -482,8 +521,8 @@ async def copy_message(request: Request) -> JSONResponse:
     to_id = body.get("to_chat_id", "")
     from_id = body.get("from_chat_id", "")
     message_id = int(body.get("message_id", 0))
-    to_cid = int(to_id) if str(to_id).lstrip("-").isdigit() else to_id
-    from_cid = int(from_id) if str(from_id).lstrip("-").isdigit() else from_id
+    to_cid = _parse_chat_id(to_id)
+    from_cid = _parse_chat_id(from_id)
     return JSONResponse(await tg.copy_message(to_cid, from_cid, message_id))
 
 
@@ -493,7 +532,7 @@ async def send_scheduled_message(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     text = body.get("text", "")
     schedule_date = body.get("schedule_date", 0)
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.send_scheduled_message(cid, text, schedule_date))
 
 
@@ -502,7 +541,7 @@ async def get_messages(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     message_ids = body.get("message_ids", [])
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.get_messages(cid, message_ids))
 
 
@@ -511,7 +550,7 @@ async def download_media(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     message_id = int(body.get("message_id", 0))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.download_media(cid, message_id))
 
 
@@ -524,7 +563,7 @@ async def send_location(request: Request) -> JSONResponse:
     chat_id = body.get("chat_id", "")
     latitude = float(body.get("latitude", 0))
     longitude = float(body.get("longitude", 0))
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.send_location(cid, latitude, longitude))
 
 
@@ -535,7 +574,7 @@ async def send_contact(request: Request) -> JSONResponse:
     phone = body.get("phone_number", "")
     first_name = body.get("first_name", "")
     last_name = body.get("last_name", "")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.send_contact(cid, phone, first_name, last_name))
 
 
@@ -547,7 +586,7 @@ async def set_typing(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     action = body.get("action", "typing")
-    cid = int(chat_id) if str(chat_id).lstrip("-").isdigit() else chat_id
+    cid = _parse_chat_id(chat_id)
     return JSONResponse(await tg.set_typing(cid, action))
 
 
@@ -575,8 +614,15 @@ async def health(request: Request) -> JSONResponse:
 # ==================== App ====================
 
 
-def create_app() -> Starlette:
+def create_app(api_token: str = "") -> Starlette:
+    global _api_token
+    _api_token = api_token
+
     return Starlette(
+        middleware=[
+            Middleware(ErrorHandlerMiddleware),
+            Middleware(AuthMiddleware),
+        ],
         routes=[
             Route("/health", health, methods=["GET"]),
             Route("/api/chat/skip", skip_chat, methods=["POST"]),

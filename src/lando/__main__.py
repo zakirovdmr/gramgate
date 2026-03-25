@@ -14,7 +14,6 @@ from pyrogram import idle
 
 from .api import create_app, set_telegram as api_set_tg
 from .config import Settings
-from .openclaw import OpenClawClient
 from .telegram import LandoTelegram
 
 logging.basicConfig(
@@ -26,19 +25,18 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 log = logging.getLogger("lando")
 
-API_PORT = 18791
-
-
 async def run():
     config = Settings()
-    log.info(
-        "Lando starting — OpenClaw at %s, Telegram phone %s, API on port %d",
-        config.openclaw_url,
-        config.telegram_phone,
-        API_PORT,
-    )
 
-    openclaw = OpenClawClient(config.openclaw_url, config.openclaw_token, config.openclaw_model)
+    # OpenClaw bridge is optional
+    openclaw = None
+    if config.openclaw_token:
+        from .openclaw import OpenClawClient
+        openclaw = OpenClawClient(config.openclaw_url, config.openclaw_token, config.openclaw_model)
+        log.info("OpenClaw bridge enabled at %s", config.openclaw_url)
+    else:
+        log.info("OpenClaw bridge disabled (OPENCLAW_TOKEN not set)")
+
     tg = LandoTelegram(config, openclaw)
 
     # Wire API to Telegram client
@@ -48,11 +46,14 @@ async def run():
     await tg.start()
 
     # Start HTTP API server
-    app = create_app()
-    uv_config = uvicorn.Config(app, host="127.0.0.1", port=API_PORT, log_level="warning")
+    app = create_app(api_token=config.api_token)
+    uv_config = uvicorn.Config(app, host=config.api_host, port=config.api_port, log_level="warning")
     uv_server = uvicorn.Server(uv_config)
     asyncio.create_task(uv_server.serve())
-    log.info("REST API started on http://127.0.0.1:%d", API_PORT)
+    log.info(
+        "Lando started — phone %s, REST API on http://%s:%d",
+        config.telegram_phone, config.api_host, config.api_port,
+    )
 
     # Graceful shutdown
     loop = asyncio.get_event_loop()
@@ -68,7 +69,8 @@ async def shutdown(tg, openclaw, uv_server):
     log.info("Shutting down...")
     uv_server.should_exit = True
     await tg.stop()
-    await openclaw.close()
+    if openclaw:
+        await openclaw.close()
 
 
 def main():
