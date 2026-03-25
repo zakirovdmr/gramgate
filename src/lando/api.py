@@ -74,6 +74,60 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+_rate_limiter = None
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if not _rate_limiter:
+            return await call_next(request)
+
+        path = request.url.path
+        if path == "/health":
+            return await call_next(request)
+
+        from .ratelimit import SEND_ACTIONS, JOIN_ACTIONS
+
+        # Check action-specific limits
+        if path in SEND_ACTIONS:
+            # Try to extract chat_id for per-chat limiting
+            chat_key = ""
+            try:
+                body = await request.body()
+                if body:
+                    import json
+                    data = json.loads(body)
+                    chat_key = str(data.get("chat_id", data.get("recipient", "")))
+            except Exception:
+                pass
+            ok, retry = _rate_limiter.check_send(chat_key)
+            if not ok:
+                return JSONResponse(
+                    {"error": "rate limit exceeded", "retry_after": round(retry, 1)},
+                    status_code=429,
+                    headers={"Retry-After": str(int(retry) + 1)},
+                )
+        elif path in JOIN_ACTIONS:
+            ok, retry = _rate_limiter.check_join()
+            if not ok:
+                return JSONResponse(
+                    {"error": "rate limit exceeded", "retry_after": round(retry, 1)},
+                    status_code=429,
+                    headers={"Retry-After": str(int(retry) + 1)},
+                )
+
+        # Global API rate
+        ok, retry = _rate_limiter.check_api()
+        if not ok:
+            return JSONResponse(
+                {"error": "rate limit exceeded", "retry_after": round(retry, 1)},
+                status_code=429,
+                headers={"Retry-After": str(int(retry) + 1)},
+            )
+
+        return await call_next(request)
+
+
 # ==================== Endpoints ====================
 
 
@@ -614,14 +668,16 @@ async def health(request: Request) -> JSONResponse:
 # ==================== App ====================
 
 
-def create_app(api_token: str = "") -> Starlette:
-    global _api_token
+def create_app(api_token: str = "", rate_limiter=None) -> Starlette:
+    global _api_token, _rate_limiter
     _api_token = api_token
+    _rate_limiter = rate_limiter
 
     return Starlette(
         middleware=[
             Middleware(ErrorHandlerMiddleware),
             Middleware(AuthMiddleware),
+            Middleware(RateLimitMiddleware),
         ],
         routes=[
             Route("/health", health, methods=["GET"]),

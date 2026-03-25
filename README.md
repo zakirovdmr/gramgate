@@ -156,6 +156,19 @@ Without it, Lando works as a pure gateway — API and MCP tools only, no auto-re
 
 Lando includes a built-in MCP (Model Context Protocol) server with all Telegram capabilities exposed as tools. This lets AI agents like Claude interact with Telegram natively.
 
+## Rate Limiting
+
+Lando includes built-in rate limiting to protect your Telegram account from flood bans. Limits are enabled by default and tuned below Telegram's thresholds:
+
+| Limit | Default | Env var |
+|-------|---------|---------|
+| Messages per chat | 20/min | `LANDO_RATE_SEND_PER_CHAT` |
+| Messages global | 30/min | `LANDO_RATE_SEND_GLOBAL` |
+| Join/leave/create | 5/hour | `LANDO_RATE_JOIN` |
+| API requests | 25/sec | `LANDO_RATE_API_GLOBAL` |
+
+When a limit is exceeded, the API returns `429 Too Many Requests` with a `Retry-After` header. Set any limit to `0` to disable it.
+
 ## Security
 
 - By default, the API binds to `127.0.0.1` (localhost only)
