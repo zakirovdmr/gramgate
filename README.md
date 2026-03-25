@@ -20,6 +20,15 @@ Telegram bots can't read channels, can't browse chat history, can't join groups 
 | React to messages | No | Yes |
 | Access 900M+ public channels | No | Yes |
 
+## Use Cases
+
+- **News & research** — delegate channel monitoring to your AI agent. It reads Telegram channels, summarizes posts, extracts key events, and reports back
+- **Customer support** — AI agent handles incoming messages, answers questions, escalates when needed
+- **E2E testing** — test your Telegram bots programmatically: send commands, click buttons, verify responses
+- **Content management** — schedule posts, manage multiple channels, cross-post between groups
+- **CRM & notifications** — send personalized messages, track responses, manage contacts
+- **Market monitoring** — track crypto, finance, or niche channels in real-time, get alerts on keywords
+
 ## Features
 
 - **40+ API endpoints** — messages, history, inline buttons, polls, pins, groups, channels, media, contacts, reactions, search
