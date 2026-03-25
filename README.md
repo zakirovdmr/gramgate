@@ -15,8 +15,8 @@ Give any HTTP client, AI agent, or automation tool full programmatic access to a
             │
             ▼
    ┌────────────────┐
-   │    GramGate     │  ← single Python process
-   │   (Pyrogram)    │
+   │    GramGate    │  ← single Python process
+   │   (Pyrogram)   │
    └───────┬────────┘
            │
      ┌─────┴─────┐
