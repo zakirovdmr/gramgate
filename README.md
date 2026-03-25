@@ -108,17 +108,28 @@ curl -X POST http://127.0.0.1:18791/api/message/send \
 
 Go to [my.telegram.org/apps](https://my.telegram.org/apps) and create an application. You'll get an `api_id` and `api_hash`.
 
-### 2. Configure
+### 2. Install
+
+```bash
+git clone https://github.com/MagicSnapBot/lando.git
+cd lando
+./install.sh
+```
+
+The install script checks all dependencies (Python 3.10+, pip, C compiler), installs Xcode Command Line Tools on macOS if needed, creates `.env` from the template, and installs Lando.
+
+Or install manually:
 
 ```bash
 cp .env.example .env
-# Edit .env with your Telegram credentials
+pip install -e .
 ```
 
-### 3. Install & run
+### 3. Configure & run
+
+Edit `.env` with your Telegram credentials, then:
 
 ```bash
-pip install -e .
 lando
 ```
 
