@@ -154,7 +154,7 @@ Without it, Lando works as a pure gateway — API and MCP tools only, no auto-re
 
 ## MCP Server
 
-Lando runs a built-in MCP (Model Context Protocol) server on port `18792` (configurable via `LANDO_MCP_PORT`). It exposes 51 Telegram tools that any MCP-compatible agent can use natively.
+Lando runs a built-in MCP (Model Context Protocol) server on port `18793` (configurable via `LANDO_MCP_PORT`). It exposes 51 Telegram tools that any MCP-compatible agent can use natively.
 
 ### Connect from Claude Desktop / Claude Code
 
@@ -164,7 +164,7 @@ Add to your MCP config (`claude_desktop_config.json` or `.claude/settings.json`)
 {
   "mcpServers": {
     "lando-telegram": {
-      "url": "http://127.0.0.1:18792/sse"
+      "url": "http://127.0.0.1:18793/sse"
     }
   }
 }

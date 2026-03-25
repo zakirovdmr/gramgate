@@ -191,7 +191,12 @@ class LandoTelegram:
                 await self.client.send_reaction(chat_id, message_id=message.id, emoji="\U0001f622")
             except Exception:
                 pass
-            await self._send_reply(chat_id, f"Error: {str(e)[:200]}", reply_to=message.id)
+            # Don't send error messages to bots — prevents reply loops
+            is_bot = getattr(message.chat, "is_bot", False) or (
+                message.from_user and getattr(message.from_user, "is_bot", False)
+            )
+            if not is_bot:
+                await self._send_reply(chat_id, f"Error: {str(e)[:200]}", reply_to=message.id)
         finally:
             if typing_task:
                 typing_task.cancel()
