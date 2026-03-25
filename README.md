@@ -169,6 +169,8 @@ Lando includes built-in rate limiting to protect your Telegram account from floo
 
 When a limit is exceeded, the API returns `429 Too Many Requests` with a `Retry-After` header. Set any limit to `0` to disable it.
 
+> **Why this matters:** Telegram actively monitors user account automation. Exceeding their (unpublished) thresholds results in `FloodWait` errors, temporary bans, or permanent account deletion. These limits exist to keep your account safe — disabling them is at your own risk.
+
 ## Security
 
 - By default, the API binds to `127.0.0.1` (localhost only)
@@ -179,6 +181,8 @@ When a limit is exceeded, the API returns `429 Too Many Requests` with a `Retry-
 ## Disclaimer
 
 This project uses Telegram's MTProto API through a user account. Use responsibly and in accordance with [Telegram's Terms of Service](https://telegram.org/tos). The authors are not responsible for any misuse or account restrictions.
+
+**Do not use Lando for spam, unsolicited messaging, or any form of abuse.** Built-in rate limits are designed to protect your account from accidental overuse — they are not a substitute for responsible usage. Telegram will permanently ban accounts that violate their terms, regardless of which tool was used.
 
 ## License
 
