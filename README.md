@@ -11,23 +11,23 @@
 Give any HTTP client, AI agent, or automation tool full programmatic access to a real Telegram account — read channels, send messages, click inline buttons, manage groups, monitor news feeds, and more.
 
 ```
-Telegram (MTProto)
-       │
-       ▼
-┌─────────────┐
-│    GramGate    │  ← single Python process
-│  (Pyrogram) │
-└──────┬──────┘
-       │
-  ┌────┴────┐
-  │         │
-  ▼         ▼
-REST API   MCP Server
- :18791     :18793
-  │         │
-  ▼         ▼
-Any HTTP   Claude, GPT,
- client    AI agents
+    Telegram (MTProto)
+            │
+            ▼
+   ┌────────────────┐
+   │    GramGate     │  ← single Python process
+   │   (Pyrogram)    │
+   └───────┬────────┘
+           │
+     ┌─────┴─────┐
+     │           │
+     ▼           ▼
+  REST API    MCP Server
+   :18791      :18793
+     │           │
+     ▼           ▼
+  Any HTTP    Claude, GPT,
+   client     AI agents
 ```
 
 ## Why not the Bot API?
