@@ -1,6 +1,6 @@
 ---
-name: lando-telegram
-description: Full Telegram account access via Lando MTProto bridge. Read channels, send/edit/delete/pin messages, manage chats and members, send polls/locations/contacts, monitor live feed from all subscribed channels and groups.
+name: gramgate-telegram
+description: Full Telegram account access via GramGate MTProto bridge. Read channels, send/edit/delete/pin messages, manage chats and members, send polls/locations/contacts, monitor live feed from all subscribed channels and groups.
 metadata:
   {
     "openclaw":
@@ -10,9 +10,9 @@ metadata:
   }
 ---
 
-# Lando — Telegram Account (MTProto)
+# GramGate — Telegram Account (MTProto)
 
-Lando provides full Telegram account capabilities via MTProto (not Bot API).
+GramGate provides full Telegram account capabilities via MTProto (not Bot API).
 All endpoints are on `http://127.0.0.1:18791`.
 
 Use `curl -s` to call these endpoints. All POST endpoints accept JSON body.
@@ -191,7 +191,7 @@ curl -s -X POST http://127.0.0.1:18791/api/typing -H 'Content-Type: application/
 
 ### Live Feed (Real-time Channel/Group Monitoring)
 
-Lando monitors ALL channels and groups the account is subscribed to. New messages are stored in memory.
+GramGate monitors ALL channels and groups the account is subscribed to. New messages are stored in memory.
 
 ```bash
 # Get NEW messages since last check (incremental — each call returns only unseen messages)
@@ -200,7 +200,7 @@ curl -s http://127.0.0.1:18791/api/feed/new?limit=100
 # Get stored messages from a specific chat
 curl -s -X POST http://127.0.0.1:18791/api/feed/chat -H 'Content-Type: application/json' -d '{"chat_id": "-1001234567890", "limit": 50}'
 
-# List all chats that received messages since Lando started
+# List all chats that received messages since GramGate started
 curl -s http://127.0.0.1:18791/api/feed/chats
 ```
 
@@ -210,5 +210,5 @@ curl -s http://127.0.0.1:18791/api/feed/chats
 - `chat_id` for users is positive (e.g. `123456789`)
 - Long messages are automatically split at 4096 chars
 - Markdown formatting is supported in sent messages
-- The live feed only contains messages received while Lando is running
+- The live feed only contains messages received while GramGate is running
 - Use `api/chat/history` to read older messages from any chat

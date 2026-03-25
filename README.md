@@ -1,4 +1,4 @@
-# Lando
+# GramGate
 
 **Telegram gateway for AI agents and automation**
 
@@ -15,7 +15,7 @@ Telegram (MTProto)
        │
        ▼
 ┌─────────────┐
-│    Lando    │  ← single Python process
+│    GramGate    │  ← single Python process
 │  (Pyrogram) │
 └──────┬──────┘
        │
@@ -32,9 +32,9 @@ Any HTTP   Claude, GPT,
 
 ## Why not the Bot API?
 
-Telegram bots can't read channels, can't browse chat history, can't join groups on their own, and can't see messages unless explicitly added as admin. Lando uses a **real user account** via MTProto — the same protocol as the Telegram app — so it can do everything a human user can:
+Telegram bots can't read channels, can't browse chat history, can't join groups on their own, and can't see messages unless explicitly added as admin. GramGate uses a **real user account** via MTProto — the same protocol as the Telegram app — so it can do everything a human user can:
 
-| Capability | Bot API | Lando (MTProto) |
+| Capability | Bot API | GramGate (MTProto) |
 |------------|---------|-----------------|
 | Read any channel you're subscribed to | No | Yes |
 | Browse full message history | No | Yes |
@@ -67,12 +67,12 @@ Telegram bots can't read channels, can't browse chat history, can't join groups 
 
 ### MCP (Claude, GPT, any MCP-compatible agent)
 
-Lando runs a built-in MCP server on port `18793` with 51 Telegram tools. Add to your MCP config:
+GramGate runs a built-in MCP server on port `18793` with 51 Telegram tools. Add to your MCP config:
 
 ```json
 {
   "mcpServers": {
-    "lando-telegram": {
+    "gramgate-telegram": {
       "url": "http://127.0.0.1:18793/sse"
     }
   }
@@ -83,7 +83,7 @@ Works with Claude Desktop, Claude Code, and any agent supporting the [Model Cont
 
 ### OpenClaw
 
-Lando ships with a ready-made OpenClaw skill:
+GramGate ships with a ready-made OpenClaw skill:
 
 ```bash
 ./extras/openclaw/install.sh
@@ -99,7 +99,7 @@ Any tool that can make HTTP requests — n8n, Make, LangChain, AutoGPT, custom s
 curl http://127.0.0.1:18791/api/me
 curl -X POST http://127.0.0.1:18791/api/message/send \
   -H "Content-Type: application/json" \
-  -d '{"recipient": "@username", "text": "Hello from Lando!"}'
+  -d '{"recipient": "@username", "text": "Hello from GramGate!"}'
 ```
 
 ## Quick Start
@@ -111,12 +111,12 @@ Go to [my.telegram.org/apps](https://my.telegram.org/apps) and create an applica
 ### 2. Install
 
 ```bash
-git clone https://github.com/MagicSnapBot/lando.git
-cd lando
+git clone https://github.com/zakirovdmr/gramgate.git
+cd gramgate
 ./install.sh
 ```
 
-The install script checks all dependencies (Python 3.10+, pip, C compiler), installs Xcode Command Line Tools on macOS if needed, creates `.env` from the template, and installs Lando.
+The install script checks all dependencies (Python 3.10+, pip, C compiler), installs Xcode Command Line Tools on macOS if needed, creates `.env` from the template, and installs GramGate.
 
 Or install manually:
 
@@ -130,7 +130,7 @@ pip install -e .
 Edit `.env` with your Telegram credentials, then:
 
 ```bash
-lando
+gramgate
 ```
 
 On first run, Pyrogram will ask for your phone number verification code in the terminal. After that, a session file is saved and subsequent runs are automatic.
@@ -150,7 +150,7 @@ curl http://127.0.0.1:18791/api/dialogs
 # Send a message
 curl -X POST http://127.0.0.1:18791/api/message/send \
   -H "Content-Type: application/json" \
-  -d '{"recipient": "@username", "text": "Hello from Lando!"}'
+  -d '{"recipient": "@username", "text": "Hello from GramGate!"}'
 
 # Read chat history with inline buttons
 curl -X POST http://127.0.0.1:18791/api/chat/history/rich \
@@ -233,10 +233,10 @@ curl -X POST http://127.0.0.1:18791/api/button/click \
 
 ## Authentication
 
-Set `LANDO_API_TOKEN` in `.env` to require bearer token auth:
+Set `GRAMGATE_API_TOKEN` in `.env` to require bearer token auth:
 
 ```bash
-LANDO_API_TOKEN=your-secret-token
+GRAMGATE_API_TOKEN=your-secret-token
 ```
 
 Then include the header in all requests:
@@ -249,14 +249,14 @@ The `/health` endpoint is always accessible without auth.
 
 ## Rate Limiting
 
-Lando includes built-in rate limiting to protect your Telegram account from flood bans. Limits are enabled by default and tuned below Telegram's thresholds:
+GramGate includes built-in rate limiting to protect your Telegram account from flood bans. Limits are enabled by default and tuned below Telegram's thresholds:
 
 | Limit | Default | Env var |
 |-------|---------|---------|
-| Messages per chat | 20/min | `LANDO_RATE_SEND_PER_CHAT` |
-| Messages global | 30/min | `LANDO_RATE_SEND_GLOBAL` |
-| Join/leave/create | 5/hour | `LANDO_RATE_JOIN` |
-| API requests | 25/sec | `LANDO_RATE_API_GLOBAL` |
+| Messages per chat | 20/min | `GRAMGATE_RATE_SEND_PER_CHAT` |
+| Messages global | 30/min | `GRAMGATE_RATE_SEND_GLOBAL` |
+| Join/leave/create | 5/hour | `GRAMGATE_RATE_JOIN` |
+| API requests | 25/sec | `GRAMGATE_RATE_API_GLOBAL` |
 
 When a limit is exceeded, the API returns `429 Too Many Requests` with a `Retry-After` header. Set any limit to `0` to disable it.
 
@@ -265,15 +265,15 @@ When a limit is exceeded, the API returns `429 Too Many Requests` with a `Retry-
 ## Security
 
 - By default, the API binds to `127.0.0.1` (localhost only)
-- Set `LANDO_API_TOKEN` for authentication when exposing to a network
-- **Never expose Lando to the public internet without authentication**
+- Set `GRAMGATE_API_TOKEN` for authentication when exposing to a network
+- **Never expose GramGate to the public internet without authentication**
 - Session files in `sessions/` contain your Telegram credentials — keep them private
 
 ## Disclaimer
 
 This project uses Telegram's MTProto API through a user account. Use responsibly and in accordance with [Telegram's Terms of Service](https://telegram.org/tos). The authors are not responsible for any misuse or account restrictions.
 
-**Do not use Lando for spam, unsolicited messaging, or any form of abuse.** Built-in rate limits are designed to protect your account from accidental overuse — they are not a substitute for responsible usage. Telegram will permanently ban accounts that violate their terms, regardless of which tool was used.
+**Do not use GramGate for spam, unsolicited messaging, or any form of abuse.** Built-in rate limits are designed to protect your account from accidental overuse — they are not a substitute for responsible usage. Telegram will permanently ban accounts that violate their terms, regardless of which tool was used.
 
 ## License
 

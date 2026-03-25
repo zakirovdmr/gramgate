@@ -1,4 +1,4 @@
-"""Lando MCP server — exposes Telegram account capabilities as tools."""
+"""GramGate MCP server — exposes Telegram account capabilities as tools."""
 
 import json
 import logging
@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 from mcp.server.fastmcp import FastMCP
 
 if TYPE_CHECKING:
-    from .telegram import LandoTelegram
+    from .telegram import GramGateTelegram
 
-log = logging.getLogger("lando.mcp")
+log = logging.getLogger("gramgate.mcp")
 
-mcp = FastMCP("lando-telegram")
+mcp = FastMCP("gramgate-telegram")
 
 
 def _parse_id(value: str) -> int | str:
@@ -20,16 +20,16 @@ def _parse_id(value: str) -> int | str:
         return int(value)
     return value
 
-# Reference to the running LandoTelegram instance (set at startup)
-_tg: "LandoTelegram | None" = None
+# Reference to the running GramGateTelegram instance (set at startup)
+_tg: "GramGateTelegram | None" = None
 
 
-def set_telegram(tg: "LandoTelegram"):
+def set_telegram(tg: "GramGateTelegram"):
     global _tg
     _tg = tg
 
 
-def _require_tg() -> "LandoTelegram":
+def _require_tg() -> "GramGateTelegram":
     if _tg is None:
         raise RuntimeError("Telegram client not initialized")
     return _tg
@@ -198,7 +198,7 @@ async def telegram_get_new_feed(limit: int = 100) -> str:
 @mcp.tool()
 async def telegram_get_chat_feed(chat_id: str, limit: int = 50) -> str:
     """Get stored messages from a specific channel/group (from live monitoring buffer).
-    Only contains messages received while Lando is running."""
+    Only contains messages received while GramGate is running."""
     tg = _require_tg()
     cid = _parse_id(chat_id)
     messages = tg.store.get_chat_feed(cid, limit)
@@ -220,7 +220,7 @@ async def telegram_get_chat_feed(chat_id: str, limit: int = 50) -> str:
 
 @mcp.tool()
 async def telegram_get_monitored_chats() -> str:
-    """List all channels/groups that have received messages since Lando started.
+    """List all channels/groups that have received messages since GramGate started.
     Shows chat_id, title, message count, and last message preview."""
     tg = _require_tg()
     return json.dumps(tg.store.get_all_chats(), ensure_ascii=False, default=str)

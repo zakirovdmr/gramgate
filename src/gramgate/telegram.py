@@ -14,7 +14,7 @@ from pyrogram.types import Message
 
 from .store import MessageStore, StoredMessage
 
-log = logging.getLogger("lando.telegram")
+log = logging.getLogger("gramgate.telegram")
 
 MAX_MESSAGE_LENGTH = 4096
 
@@ -66,7 +66,7 @@ def _media_type(message: Message) -> Optional[str]:
     return None
 
 
-class LandoTelegram:
+class GramGateTelegram:
     """Pyrogram MTProto client that forwards messages to OpenClaw
     and exposes full account capabilities via MCP tools."""
 
@@ -85,7 +85,7 @@ class LandoTelegram:
         session_dir.mkdir(parents=True, exist_ok=True)
 
         self.client = Client(
-            name="lando",
+            name="gramgate",
             api_id=self.config.telegram_api_id,
             api_hash=self.config.telegram_api_hash,
             phone_number=self.config.telegram_phone,
@@ -120,7 +120,7 @@ class LandoTelegram:
         self._running = True
 
         me = await self.client.get_me()
-        log.info("Lando started as @%s (id=%s)", me.username, me.id)
+        log.info("GramGate started as @%s (id=%s)", me.username, me.id)
 
     def _store_message(self, message: Message):
         """Store message in the feed."""
@@ -163,7 +163,7 @@ class LandoTelegram:
             return
 
         chat_id = message.chat.id
-        session_key = f"lando:{chat_id}"
+        session_key = f"gramgate:{chat_id}"
         typing_task: Optional[asyncio.Task] = None
 
         try:
@@ -704,4 +704,4 @@ class LandoTelegram:
         if self.client and self._running:
             await self.client.stop()
             self._running = False
-            log.info("Lando stopped")
+            log.info("GramGate stopped")

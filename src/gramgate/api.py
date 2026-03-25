@@ -1,4 +1,4 @@
-"""Lando HTTP REST API — simple JSON endpoints for Telegram account actions."""
+"""GramGate HTTP REST API — simple JSON endpoints for Telegram account actions."""
 
 import logging
 import traceback
@@ -12,20 +12,20 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 if TYPE_CHECKING:
-    from .telegram import LandoTelegram
+    from .telegram import GramGateTelegram
 
-log = logging.getLogger("lando.api")
+log = logging.getLogger("gramgate.api")
 
-_tg: "LandoTelegram | None" = None
+_tg: "GramGateTelegram | None" = None
 _api_token: str = ""
 
 
-def set_telegram(tg: "LandoTelegram"):
+def set_telegram(tg: "GramGateTelegram"):
     global _tg
     _tg = tg
 
 
-def _require_tg() -> "LandoTelegram":
+def _require_tg() -> "GramGateTelegram":
     if _tg is None:
         raise RuntimeError("Telegram not initialized")
     return _tg

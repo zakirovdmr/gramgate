@@ -1,9 +1,9 @@
 #!/bin/bash
-# Install Lando skill into OpenClaw
+# Install GramGate skill into OpenClaw
 # Usage: ./install.sh [openclaw_skills_dir]
 
 SKILLS_DIR="${1:-$HOME/.openclaw/skills}"
-SKILL_NAME="lando-telegram"
+SKILL_NAME="gramgate-telegram"
 
 if [ ! -d "$SKILLS_DIR" ]; then
     echo "Error: OpenClaw skills directory not found at $SKILLS_DIR"

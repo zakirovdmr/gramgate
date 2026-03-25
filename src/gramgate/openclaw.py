@@ -5,7 +5,7 @@ from typing import Optional
 
 import httpx
 
-log = logging.getLogger("lando.openclaw")
+log = logging.getLogger("gramgate.openclaw")
 
 # OpenClaw supported input_file MIME types
 SUPPORTED_FILE_MIMES = {
@@ -33,7 +33,7 @@ class OpenClawClient:
 
         Args:
             text: User message text.
-            session_key: Session key for conversation context (e.g. "lando:12345").
+            session_key: Session key for conversation context (e.g. "gramgate:12345").
             images: List of {"data": base64_str, "media_type": "image/jpeg"}.
             files: List of {"data": base64_str, "media_type": "...", "filename": "..."}.
 

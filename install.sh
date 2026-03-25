@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Lando installer — checks dependencies and installs everything needed
+# GramGate installer — checks dependencies and installs everything needed
 
 PYTHON_MIN="3.10"
 RED='\033[0;31m'
@@ -14,7 +14,7 @@ warn() { echo -e "${YELLOW}!${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; }
 
 echo ""
-echo "  Lando — Telegram gateway for AI agents"
+echo "  GramGate — Telegram gateway for AI agents"
 echo "  ─────────────────────────────────────────"
 echo ""
 
@@ -104,7 +104,7 @@ if [ ! -f .env ]; then
         cp .env.example .env
         warn ".env created from .env.example — edit it with your Telegram credentials"
     else
-        fail ".env.example not found. Are you in the Lando directory?"
+        fail ".env.example not found. Are you in the GramGate directory?"
         exit 1
     fi
 else
@@ -125,23 +125,23 @@ fi
 # ── Install ──
 
 echo ""
-echo "Installing Lando..."
+echo "Installing GramGate..."
 echo ""
 $PYTHON -m pip install -e . 2>&1 | tail -5
 
 echo ""
-ok "Lando installed successfully!"
+ok "GramGate installed successfully!"
 echo ""
 echo "  Next steps:"
 echo ""
 if [ -z "$API_ID" ] || [ "$API_ID" = "" ]; then
     echo "  1. Get Telegram API credentials: https://my.telegram.org/apps"
     echo "  2. Edit .env with your credentials"
-    echo "  3. Run: lando"
+    echo "  3. Run: gramgate"
 else
-    echo "  Run: lando"
+    echo "  Run: gramgate"
 fi
 echo ""
 echo "  On first run, you'll be asked for your Telegram verification code."
-echo "  After that, Lando starts automatically."
+echo "  After that, GramGate starts automatically."
 echo ""

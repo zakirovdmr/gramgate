@@ -1,4 +1,4 @@
-"""Lando entry point — python -m lando
+"""GramGate entry point — python -m gramgate
 
 Runs both:
 - Pyrogram MTProto client (Telegram transport + message bridge)
@@ -15,7 +15,7 @@ from pyrogram import idle
 from .api import create_app, set_telegram as api_set_tg
 from .config import Settings
 from .mcp_server import mcp as mcp_server, set_telegram as mcp_set_tg
-from .telegram import LandoTelegram
+from .telegram import GramGateTelegram
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +24,7 @@ logging.basicConfig(
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-log = logging.getLogger("lando")
+log = logging.getLogger("gramgate")
 
 async def run():
     config = Settings()
@@ -38,7 +38,7 @@ async def run():
     else:
         log.info("OpenClaw bridge disabled (OPENCLAW_TOKEN not set)")
 
-    tg = LandoTelegram(config, openclaw)
+    tg = GramGateTelegram(config, openclaw)
 
     # Wire Telegram client to API and MCP
     api_set_tg(tg)
@@ -75,7 +75,7 @@ async def run():
         log.info("MCP server (SSE) on http://%s:%d/sse", config.api_host, config.mcp_port)
 
     log.info(
-        "Lando started — phone %s, REST API on http://%s:%d",
+        "GramGate started — phone %s, REST API on http://%s:%d",
         config.telegram_phone, config.api_host, config.api_port,
     )
 
