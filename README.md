@@ -278,3 +278,7 @@ This project uses Telegram's MTProto API through a user account. Use responsibly
 ## License
 
 MIT
+
+---
+
+Built by [Damir Zakirov](https://github.com/zakirovdmr) with [Claude Code](https://claude.ai/code)
