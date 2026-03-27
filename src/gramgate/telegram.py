@@ -85,7 +85,7 @@ class GramGateTelegram:
         session_dir.mkdir(parents=True, exist_ok=True)
 
         self.client = Client(
-            name="gramgate",
+            name="lando",
             api_id=self.config.telegram_api_id,
             api_hash=self.config.telegram_api_hash,
             phone_number=self.config.telegram_phone,
@@ -293,9 +293,9 @@ class GramGateTelegram:
             })
         return result
 
-    async def get_chat_history(self, chat_id, limit: int = 30) -> list[dict]:
+    async def get_chat_history(self, chat_id, limit: int = 30, offset_id: int = 0, reverse: bool = False) -> list[dict]:
         result = []
-        async for msg in self.client.get_chat_history(chat_id, limit=limit):
+        async for msg in self.client.get_chat_history(chat_id, limit=limit, offset_id=offset_id, reverse=reverse):
             result.append({
                 "id": msg.id,
                 "from": msg.from_user.username if msg.from_user else None,
@@ -319,10 +319,10 @@ class GramGateTelegram:
             "description": getattr(chat, "description", None),
         }
 
-    async def get_chat_history_rich(self, chat_id, limit: int = 30) -> list[dict]:
+    async def get_chat_history_rich(self, chat_id, limit: int = 30, offset_id: int = 0, reverse: bool = False) -> list[dict]:
         """Chat history with inline button data included."""
         result = []
-        async for msg in self.client.get_chat_history(chat_id, limit=limit):
+        async for msg in self.client.get_chat_history(chat_id, limit=limit, offset_id=offset_id, reverse=reverse):
             entry = {
                 "id": msg.id,
                 "from": msg.from_user.username if msg.from_user else None,

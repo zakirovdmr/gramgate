@@ -67,12 +67,13 @@ async def telegram_get_chat_info(chat_id: str) -> str:
 
 
 @mcp.tool()
-async def telegram_get_chat_history(chat_id: str, limit: int = 30) -> str:
-    """Read recent messages from any chat, group, or channel.
-    chat_id can be numeric ID or @username. Returns up to `limit` messages."""
+async def telegram_get_chat_history(chat_id: str, limit: int = 30, offset_id: int = 0, reverse: bool = False) -> str:
+    """Read messages from any chat, group, or channel.
+    chat_id can be numeric ID or @username. Returns up to `limit` messages.
+    offset_id: start from this message ID (0 = latest). reverse: True = oldest first."""
     tg = _require_tg()
     cid = _parse_id(chat_id)
-    return json.dumps(await tg.get_chat_history(cid, limit), ensure_ascii=False)
+    return json.dumps(await tg.get_chat_history(cid, limit, offset_id=offset_id, reverse=reverse), ensure_ascii=False)
 
 
 @mcp.tool()

@@ -166,8 +166,10 @@ async def get_chat_history(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     limit = int(body.get("limit", 30))
+    offset_id = int(body.get("offset_id", 0))
+    reverse = bool(body.get("reverse", False))
     cid = _parse_chat_id(chat_id)
-    return JSONResponse(await tg.get_chat_history(cid, limit))
+    return JSONResponse(await tg.get_chat_history(cid, limit, offset_id=offset_id, reverse=reverse))
 
 
 async def get_chat_members(request: Request) -> JSONResponse:
@@ -184,8 +186,10 @@ async def get_chat_history_rich(request: Request) -> JSONResponse:
     body = await _json_body(request)
     chat_id = body.get("chat_id", "")
     limit = int(body.get("limit", 30))
+    offset_id = int(body.get("offset_id", 0))
+    reverse = bool(body.get("reverse", False))
     cid = _parse_chat_id(chat_id)
-    return JSONResponse(await tg.get_chat_history_rich(cid, limit))
+    return JSONResponse(await tg.get_chat_history_rich(cid, limit, offset_id=offset_id, reverse=reverse))
 
 
 async def click_inline_button(request: Request) -> JSONResponse:
