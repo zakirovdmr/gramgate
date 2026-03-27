@@ -106,7 +106,7 @@ curl -X POST http://127.0.0.1:18791/api/message/send \
 
 ### 1. Get Telegram API credentials
 
-Go to [my.telegram.org/apps](https://my.telegram.org/apps) and create an application. You'll get an `api_id` and `api_hash`.
+Go to [my.telegram.org/apps](https://my.telegram.org/apps) and create an application. You'll get an `api_id` and `api_hash`. See the [official Telegram guide](https://core.telegram.org/api/obtaining_api_id) for detailed steps.
 
 ### 2. Install
 
