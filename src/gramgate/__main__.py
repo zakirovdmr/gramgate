@@ -44,9 +44,6 @@ async def run():
     api_set_tg(tg)
     mcp_set_tg(tg)
 
-    # Start Pyrogram
-    await tg.start()
-
     # Rate limiter
     from .ratelimit import RateLimiter, RateLimit
     rate_limiter = RateLimiter(
@@ -61,11 +58,13 @@ async def run():
         config.rate_join, config.rate_api_global,
     )
 
-    # Start HTTP API server
+    # Start HTTP API server BEFORE Telegram auth — so /api/auth/code is available
     app = create_app(api_token=config.api_token, rate_limiter=rate_limiter)
     uv_config = uvicorn.Config(app, host=config.api_host, port=config.api_port, log_level="warning")
     uv_server = uvicorn.Server(uv_config)
     asyncio.create_task(uv_server.serve())
+    log.info("REST API on http://%s:%d (auth endpoints ready)", config.api_host, config.api_port)
+
     # Start MCP server (SSE transport)
     if config.mcp_port:
         mcp_app = mcp_server.sse_app()
@@ -73,6 +72,9 @@ async def run():
         mcp_uv_server = uvicorn.Server(mcp_uv_config)
         asyncio.create_task(mcp_uv_server.serve())
         log.info("MCP server (SSE) on http://%s:%d/sse", config.api_host, config.mcp_port)
+
+    # Now start Pyrogram — if auth needed, code can be submitted via API
+    await tg.start()
 
     log.info(
         "GramGate started — phone %s, REST API on http://%s:%d",

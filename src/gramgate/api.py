@@ -73,7 +73,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if not _api_token:
             return await call_next(request)
-        if request.url.path == "/health":
+        if request.url.path in ("/health", "/api/auth/code", "/api/auth/2fa"):
             return await call_next(request)
         auth = request.headers.get("authorization", "")
         if auth != f"Bearer {_api_token}":
@@ -677,7 +677,29 @@ async def skip_chat(request: Request) -> JSONResponse:
 
 async def health(request: Request) -> JSONResponse:
     tg = _require_tg()
-    return JSONResponse({"status": "ok", "running": tg._running})
+    return JSONResponse({"status": "ok", "running": tg._running, "auth_state": tg._auth_state})
+
+
+async def submit_auth_code(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    code = str(body.get("code", "")).strip()
+    if not code:
+        return JSONResponse({"error": "code is required"}, status_code=400)
+    if tg.submit_auth_code(code):
+        return JSONResponse({"ok": True, "message": "Code submitted, waiting for authorization..."})
+    return JSONResponse({"error": f"Not awaiting code (state: {tg._auth_state})"}, status_code=409)
+
+
+async def submit_auth_2fa(request: Request) -> JSONResponse:
+    tg = _require_tg()
+    body = await _json_body(request)
+    password = str(body.get("password", "")).strip()
+    if not password:
+        return JSONResponse({"error": "password is required"}, status_code=400)
+    if tg.submit_auth_code(password):
+        return JSONResponse({"ok": True, "message": "2FA password submitted, waiting for authorization..."})
+    return JSONResponse({"error": f"Not awaiting 2FA (state: {tg._auth_state})"}, status_code=409)
 
 
 # ==================== App ====================
@@ -696,6 +718,8 @@ def create_app(api_token: str = "", rate_limiter=None) -> Starlette:
         ],
         routes=[
             Route("/health", health, methods=["GET"]),
+            Route("/api/auth/code", submit_auth_code, methods=["POST"]),
+            Route("/api/auth/2fa", submit_auth_2fa, methods=["POST"]),
             Route("/api/chat/skip", skip_chat, methods=["POST"]),
             # Account
             Route("/api/me", get_me, methods=["GET"]),

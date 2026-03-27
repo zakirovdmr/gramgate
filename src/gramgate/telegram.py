@@ -18,6 +18,12 @@ log = logging.getLogger("gramgate.telegram")
 
 MAX_MESSAGE_LENGTH = 4096
 
+# Auth states
+AUTH_STATE_NONE = "none"
+AUTH_STATE_AWAITING_CODE = "awaiting_code"
+AUTH_STATE_AWAITING_2FA = "awaiting_2fa"
+AUTH_STATE_AUTHORIZED = "authorized"
+
 
 def _convert_markdown_for_telegram(text: str) -> str:
     """Convert GitHub-style Markdown headers to Telegram-compatible bold."""
@@ -76,6 +82,9 @@ class GramGateTelegram:
         self.client: Optional[Client] = None
         self.store = MessageStore()
         self._running = False
+        self._auth_state = AUTH_STATE_NONE
+        self._auth_code_future: Optional[asyncio.Future] = None
+        self._auth_phone_code_hash: Optional[str] = None
 
     async def start(self):
         if self._running:
@@ -121,11 +130,60 @@ class GramGateTelegram:
         async def on_channel(client: Client, message: Message):
             self._store_message(message)
 
-        await self.client.start()
-        self._running = True
+        # Try connect — if session is valid, skip auth
+        is_authorized = await self.client.connect()
 
-        me = await self.client.get_me()
+        if not is_authorized:
+            log.warning("Session not authorized — sending code, waiting for input via API")
+            try:
+                sent_code = await self.client.send_code(self.config.telegram_phone)
+                self._auth_phone_code_hash = sent_code.phone_code_hash
+                self._auth_state = AUTH_STATE_AWAITING_CODE
+                log.info("Auth code sent to Telegram. POST /api/auth/code to continue.")
+
+                # Wait for code to be submitted via API
+                self._auth_code_future = asyncio.get_event_loop().create_future()
+                code = await self._auth_code_future
+                self._auth_code_future = None
+
+                try:
+                    await self.client.sign_in(
+                        self.config.telegram_phone, self._auth_phone_code_hash, code
+                    )
+                except Exception as e:
+                    if "TWO_STEPS_VERIFICATION" in str(e) or "SESSION_PASSWORD_NEEDED" in str(e):
+                        self._auth_state = AUTH_STATE_AWAITING_2FA
+                        log.info("2FA required. POST /api/auth/2fa to continue.")
+                        self._auth_code_future = asyncio.get_event_loop().create_future()
+                        password = await self._auth_code_future
+                        self._auth_code_future = None
+                        await self.client.check_password(password)
+                    else:
+                        raise
+            except Exception:
+                self._auth_state = AUTH_STATE_NONE
+                raise
+
+        self._auth_state = AUTH_STATE_AUTHORIZED
+
+        await self.client.invoke(
+            __import__("pyrogram.raw", fromlist=["functions"]).functions.updates.GetState()
+        )
+        self.client.me = await self.client.get_me()
+        await self.client.initialize()
+
+        self._running = True
+        me = self.client.me
         log.info("GramGate started as @%s (id=%s)", me.username, me.id)
+
+    def submit_auth_code(self, code: str) -> bool:
+        """Submit auth code from API. Returns True if accepted."""
+        if self._auth_state not in (AUTH_STATE_AWAITING_CODE, AUTH_STATE_AWAITING_2FA):
+            return False
+        if self._auth_code_future and not self._auth_code_future.done():
+            self._auth_code_future.set_result(code)
+            return True
+        return False
 
     def _store_message(self, message: Message):
         """Store message in the feed."""
