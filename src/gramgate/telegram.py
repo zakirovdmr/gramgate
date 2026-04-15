@@ -499,13 +499,31 @@ class GramGateTelegram:
         await self.client.read_chat_history(chat_id)
         return {"ok": True}
 
-    async def send_photo(self, chat_id, photo_path: str, caption: str = "") -> dict:
-        msg = await self.client.send_photo(chat_id, photo_path, caption=caption)
-        return {"message_id": msg.id}
+    async def send_photo(self, recipient, photo_path: str, caption: str = "") -> dict:
+        if isinstance(recipient, str) and recipient.startswith("@"):
+            recipient = recipient[1:]
+        log.info("SEND_PHOTO to=%s path=%s", recipient, photo_path)
+        caption_md = _convert_markdown_for_telegram(caption) if caption else None
+        msg = await self.client.send_photo(
+            recipient,
+            photo_path,
+            caption=caption_md,
+            parse_mode=ParseMode.MARKDOWN if caption_md else None,
+        )
+        return {"message_id": msg.id, "chat_id": msg.chat.id}
 
-    async def send_file(self, chat_id, file_path: str, caption: str = "") -> dict:
-        msg = await self.client.send_document(chat_id, file_path, caption=caption)
-        return {"message_id": msg.id}
+    async def send_file(self, recipient, file_path: str, caption: str = "") -> dict:
+        if isinstance(recipient, str) and recipient.startswith("@"):
+            recipient = recipient[1:]
+        log.info("SEND_FILE to=%s path=%s", recipient, file_path)
+        caption_md = _convert_markdown_for_telegram(caption) if caption else None
+        msg = await self.client.send_document(
+            recipient,
+            file_path,
+            caption=caption_md,
+            parse_mode=ParseMode.MARKDOWN if caption_md else None,
+        )
+        return {"message_id": msg.id, "chat_id": msg.chat.id}
 
     # ==================== Edit / Delete messages ====================
 

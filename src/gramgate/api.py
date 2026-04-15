@@ -211,6 +211,42 @@ async def send_message(request: Request) -> JSONResponse:
     return JSONResponse(await tg.send_message_to(rcpt, text))
 
 
+async def send_document(request: Request) -> JSONResponse:
+    """Send a file from local path as a Telegram document (original bytes, not compressed)."""
+    import os
+    tg = _require_tg()
+    body = await _json_body(request)
+    recipient = body.get("recipient", "")
+    file_path = body.get("file_path", "")
+    caption = body.get("caption", "")
+    if not recipient:
+        raise ValueError("recipient is required")
+    if not file_path:
+        raise ValueError("file_path is required")
+    if not os.path.isfile(file_path):
+        raise ValueError(f"file not found: {file_path}")
+    rcpt = _parse_chat_id(recipient)
+    return JSONResponse(await tg.send_file(rcpt, file_path, caption))
+
+
+async def send_photo_http(request: Request) -> JSONResponse:
+    """Send a photo from local path (compressed by Telegram, preview inline)."""
+    import os
+    tg = _require_tg()
+    body = await _json_body(request)
+    recipient = body.get("recipient", "")
+    photo_path = body.get("photo_path", "")
+    caption = body.get("caption", "")
+    if not recipient:
+        raise ValueError("recipient is required")
+    if not photo_path:
+        raise ValueError("photo_path is required")
+    if not os.path.isfile(photo_path):
+        raise ValueError(f"file not found: {photo_path}")
+    rcpt = _parse_chat_id(recipient)
+    return JSONResponse(await tg.send_photo(rcpt, photo_path, caption))
+
+
 async def join_chat(request: Request) -> JSONResponse:
     tg = _require_tg()
     body = await _json_body(request)
@@ -748,6 +784,8 @@ def create_app(api_token: str = "", rate_limiter=None) -> Starlette:
             Route("/api/chat/invite/create", create_chat_invite_link, methods=["POST"]),
             # Messages
             Route("/api/message/send", send_message, methods=["POST"]),
+            Route("/api/message/send/document", send_document, methods=["POST"]),
+            Route("/api/message/send/photo", send_photo_http, methods=["POST"]),
             Route("/api/message/edit", edit_message, methods=["POST"]),
             Route("/api/message/delete", delete_messages, methods=["POST"]),
             Route("/api/message/pin", pin_message, methods=["POST"]),

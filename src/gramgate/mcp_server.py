@@ -114,6 +114,37 @@ async def telegram_send_message(recipient: str, text: str) -> str:
 
 
 @mcp.tool()
+async def telegram_send_document(recipient: str, file_path: str, caption: str = "") -> str:
+    """Send a local file as a Telegram document (original bytes, not compressed).
+    Use for .md, .pdf, .zip, code files, or any file you want delivered as-is.
+    recipient: @username, phone number, or numeric chat_id.
+    file_path: absolute path to a local file on the machine running GramGate.
+    caption: optional text shown under the file (supports Markdown, max 1024 chars)."""
+    import os
+    tg = _require_tg()
+    if not os.path.isfile(file_path):
+        return json.dumps({"error": f"file not found: {file_path}"}, ensure_ascii=False)
+    rcpt = _parse_id(recipient)
+    return json.dumps(await tg.send_file(rcpt, file_path, caption), ensure_ascii=False)
+
+
+@mcp.tool()
+async def telegram_send_photo(recipient: str, photo_path: str, caption: str = "") -> str:
+    """Send a local image as a Telegram photo (compressed, inline preview).
+    Use for .jpg, .png, .webp shown as a regular photo. For original-quality image
+    delivery use telegram_send_document instead.
+    recipient: @username, phone number, or numeric chat_id.
+    photo_path: absolute path to a local image file.
+    caption: optional text shown under the photo (supports Markdown, max 1024 chars)."""
+    import os
+    tg = _require_tg()
+    if not os.path.isfile(photo_path):
+        return json.dumps({"error": f"file not found: {photo_path}"}, ensure_ascii=False)
+    rcpt = _parse_id(recipient)
+    return json.dumps(await tg.send_photo(rcpt, photo_path, caption), ensure_ascii=False)
+
+
+@mcp.tool()
 async def telegram_search_messages(chat_id: str, query: str, limit: int = 20) -> str:
     """Search messages in a specific chat by text query."""
     tg = _require_tg()

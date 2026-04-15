@@ -191,6 +191,8 @@ curl -X POST http://127.0.0.1:18791/api/button/click \
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/message/send` | Send message |
+| POST | `/api/message/send/document` | Send file as document (original bytes) |
+| POST | `/api/message/send/photo` | Send image as photo (compressed, inline preview) |
 | POST | `/api/message/edit` | Edit message |
 | POST | `/api/message/delete` | Delete messages |
 | POST | `/api/message/forward` | Forward messages |
