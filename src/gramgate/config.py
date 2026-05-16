@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     openclaw_token: str = Field(default="", alias="OPENCLAW_TOKEN")
     openclaw_model: str = Field(default="openclaw", alias="OPENCLAW_MODEL")
 
+    # Chat IDs the OpenClaw bridge must never forward (bots we drive via the
+    # API/MCP — e.g. reframir_bot — would otherwise loop: bot replies →
+    # bridge → OpenClaw → bot). Comma-separated. Seeds the persistent
+    # skip-list on startup; runtime /api/chat/skip additions persist too.
+    bridge_skip_chats: str = Field(default="", alias="GRAMGATE_BRIDGE_SKIP_CHATS")
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

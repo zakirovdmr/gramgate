@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import json
 import logging
 import re
 import tempfile
@@ -85,6 +86,39 @@ class GramGateTelegram:
         self._auth_state = AUTH_STATE_NONE
         self._auth_code_future: Optional[asyncio.Future] = None
         self._auth_phone_code_hash: Optional[str] = None
+        self._skip_file: Optional[Path] = None
+
+    def _load_skip_chats(self) -> set[int]:
+        """Seed the bridge skip-list from config + the persistent file.
+
+        Config (GRAMGATE_BRIDGE_SKIP_CHATS) is the declarative floor;
+        the JSON file carries runtime /api/chat/skip additions. Union of
+        both. Never raises — a bad file must not block startup."""
+        ids: set[int] = set()
+        raw = getattr(self.config, "bridge_skip_chats", "") or ""
+        for part in raw.split(","):
+            part = part.strip()
+            if part:
+                try:
+                    ids.add(int(part))
+                except ValueError:
+                    log.warning("Ignoring non-int in GRAMGATE_BRIDGE_SKIP_CHATS: %r", part)
+        try:
+            if self._skip_file and self._skip_file.exists():
+                ids.update(int(x) for x in json.loads(self._skip_file.read_text()))
+        except Exception as e:  # noqa: BLE001 — corrupt file must not crash boot
+            log.warning("Could not read skip-list file %s: %s", self._skip_file, e)
+        if ids:
+            log.info("Bridge skip-list loaded: %s", sorted(ids))
+        return ids
+
+    def _persist_skip_chats(self) -> None:
+        """Write the current skip-list so runtime changes survive restart."""
+        try:
+            if self._skip_file:
+                self._skip_file.write_text(json.dumps(sorted(self._skip_chat_ids)))
+        except Exception as e:  # noqa: BLE001 — persistence failure must not break the bridge
+            log.warning("Could not persist skip-list to %s: %s", self._skip_file, e)
 
     async def start(self):
         if self._running:
@@ -101,8 +135,12 @@ class GramGateTelegram:
             workdir=str(session_dir),
         )
 
-        # Chat IDs to skip (bots we test via API, not OpenClaw bridge)
-        self._skip_chat_ids: set[int] = set()
+        # Chat IDs to skip (bots we drive via API/MCP, not OpenClaw bridge).
+        # Persisted across restarts: seeded from GRAMGATE_BRIDGE_SKIP_CHATS
+        # config + a JSON file in the (persistent) session dir. Without this
+        # a restart drops the set and bot-chats loop back into the bridge.
+        self._skip_file: Path = session_dir / "skip_chats.json"
+        self._skip_chat_ids: set[int] = self._load_skip_chats()
 
         # Private messages (not from self)
         @self.client.on_message(filters.private & ~filters.me)

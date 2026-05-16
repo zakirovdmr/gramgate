@@ -708,6 +708,7 @@ async def skip_chat(request: Request) -> JSONResponse:
         tg._skip_chat_ids.discard(chat_id)
     else:
         tg._skip_chat_ids.add(chat_id)
+    tg._persist_skip_chats()  # survive gramgate restart
     return JSONResponse({"ok": True, "skip_chat_ids": list(tg._skip_chat_ids)})
 
 
