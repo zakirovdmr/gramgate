@@ -77,6 +77,17 @@ async def telegram_get_chat_history(chat_id: str, limit: int = 30, offset_id: in
 
 
 @mcp.tool()
+async def telegram_get_chat_history_rich(chat_id: str, limit: int = 30, offset_id: int = 0, reverse: bool = False) -> str:
+    """Read messages with inline button data included.
+    Same as get_chat_history but each message may contain a 'buttons' array with text, callback_data, and url.
+    Use this before telegram_click_inline_button to discover available callback_data values.
+    chat_id can be numeric ID or @username."""
+    tg = _require_tg()
+    cid = _parse_id(chat_id)
+    return json.dumps(await tg.get_chat_history_rich(cid, limit, offset_id=offset_id, reverse=reverse), ensure_ascii=False)
+
+
+@mcp.tool()
 async def telegram_get_chat_members(chat_id: str, limit: int = 50) -> str:
     """Get members of a group or channel. Returns user_id, username, first_name, status."""
     tg = _require_tg()
@@ -280,6 +291,16 @@ async def telegram_delete_messages(chat_id: str, message_ids: str) -> str:
     cid = _parse_id(chat_id)
     ids = [int(x.strip()) for x in message_ids.split(",")]
     return json.dumps(await tg.delete_messages(cid, ids), ensure_ascii=False)
+
+
+@mcp.tool()
+async def telegram_click_inline_button(chat_id: str, message_id: int, callback_data: str) -> str:
+    """Click an inline button on a message by its callback_data.
+    Use telegram_get_chat_history first to see messages with buttons and their callback_data values.
+    chat_id can be numeric ID or @username."""
+    tg = _require_tg()
+    cid = _parse_id(chat_id)
+    return json.dumps(await tg.click_inline_button(cid, message_id, callback_data), ensure_ascii=False)
 
 
 # ==================== Pin / Unpin ====================
