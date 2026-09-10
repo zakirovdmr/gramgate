@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from pyrogram import Client, filters
-from pyrogram.enums import ChatAction, ParseMode
+from pyrogram.enums import ChatAction, ChatType, ParseMode
 from pyrogram.types import Message
 
 from .store import MessageStore, StoredMessage
@@ -151,6 +151,9 @@ class GramGateTelegram:
             if message.chat.id in self._skip_chat_ids:
                 log.debug("Skipped (in skip list): chat=%s", message.chat.id)
                 return
+            if self._is_bot_sender(message):
+                log.info("Skipped (bot sender, not bridged): chat=%s", message.chat.id)
+                return
             if self.openclaw:
                 await self._handle(message)
 
@@ -161,6 +164,9 @@ class GramGateTelegram:
             if message.mentioned and self.openclaw:
                 sender = message.from_user.username or message.from_user.id if message.from_user else "?"
                 log.info("MSG mention group=%s from=%s text=%s", message.chat.id, sender, (message.text or "")[:80])
+                if self._is_bot_sender(message):
+                    log.info("Skipped (bot sender, not bridged): group=%s from=%s", message.chat.id, sender)
+                    return
                 await self._handle(message, is_group=True)
 
         # Channel messages — always store
@@ -245,6 +251,18 @@ class GramGateTelegram:
             log.debug("Failed to store message: %s", e)
 
     # ==================== Message bridge (private/mentioned → OpenClaw) ====================
+
+    @staticmethod
+    def _is_bot_sender(message: Message) -> bool:
+        """True when the message comes from a bot — a private bot chat or a bot user.
+
+        Bots are never bridged to OpenClaw: a bot's replies would be forwarded
+        to OpenClaw, whose answers go back to the bot, and the two loop
+        (reframir_bot, bank bots). Bots are driven via the REST/MCP API instead.
+        """
+        if message.chat is not None and message.chat.type == ChatType.BOT:
+            return True
+        return bool(message.from_user is not None and message.from_user.is_bot)
 
     async def _handle(self, message: Message, is_group: bool = False):
         """Handle incoming message: download media, forward to OpenClaw, reply."""
