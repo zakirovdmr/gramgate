@@ -1,16 +1,20 @@
 """GramGate HTTP REST API — simple JSON endpoints for Telegram account actions."""
 
+import json
 import logging
 import time
 import traceback
 from typing import TYPE_CHECKING
 
+from pyrogram.errors import FloodWait, RPCError
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+
+from . import audit
 
 if TYPE_CHECKING:
     from .telegram import GramGateTelegram
@@ -59,6 +63,25 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             if request.url.path != "/health":
                 log.debug("%s %s → %d (%.0fms)", request.method, request.url.path, response.status_code, elapsed)
             return response
+        except RPCError as e:
+            # Telegram refused the request (CHANNEL_PRIVATE, USER_NOT_PARTICIPANT,
+            # FLOOD_WAIT...). That is a client-side problem, not a crash: answer
+            # with Telegram's own 4xx code and one log line, no traceback.
+            code = int(getattr(e, "CODE", 0) or 0)
+            status = code if 400 <= code < 500 else 502
+            body = {
+                "error": getattr(e, "ID", None) or type(e).__name__,
+                "telegram_code": code,
+                "detail": str(e)[:300],
+            }
+            headers = {}
+            if isinstance(e, FloodWait):
+                status = 429
+                retry = int(getattr(e, "value", 1) or 1)
+                body["retry_after"] = retry
+                headers["Retry-After"] = str(retry)
+            log.warning("%s %s → %d telegram=%s", request.method, request.url.path, status, body["error"])
+            return JSONResponse(body, status_code=status, headers=headers)
         except ValueError as e:
             log.warning("%s %s → 400: %s", request.method, request.url.path, e)
             return JSONResponse({"error": str(e)}, status_code=400)
@@ -137,6 +160,39 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
 
         return await call_next(request)
+
+
+class AuditMiddleware(BaseHTTPMiddleware):
+    """One audit line per REST call: method+path, optional X-GramGate-Caller,
+    target chat/recipient and text length taken from the JSON body, status, duration.
+    Message text itself is never recorded."""
+
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+        if path == "/health":
+            return await call_next(request)
+        start = time.monotonic()
+        args: dict = {}
+        if request.method == "POST":
+            try:
+                raw = await request.body()  # Starlette replays it for the handlers
+                if raw:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        args = parsed
+            except Exception:  # noqa: BLE001 — bad JSON is reported by the handler
+                args = {}
+        response = await call_next(request)
+        audit.record(
+            "rest",
+            f"{request.method} {path}",
+            caller=request.headers.get("x-gramgate-caller"),
+            target=audit.target_of(args),
+            size=audit.size_of(args),
+            status=response.status_code,
+            ms=(time.monotonic() - start) * 1000,
+        )
+        return response
 
 
 # ==================== Endpoints ====================
@@ -223,8 +279,8 @@ async def send_document(request: Request) -> JSONResponse:
         raise ValueError("recipient is required")
     if not file_path:
         raise ValueError("file_path is required")
-    if not os.path.isfile(file_path):
-        raise ValueError(f"file not found: {file_path}")
+    if not os.path.isfile(file_path) or not os.access(file_path, os.R_OK):
+        raise ValueError(f"file not found or not readable by the GramGate service: {file_path}")
     rcpt = _parse_chat_id(recipient)
     return JSONResponse(await tg.send_file(rcpt, file_path, caption))
 
@@ -241,8 +297,8 @@ async def send_photo_http(request: Request) -> JSONResponse:
         raise ValueError("recipient is required")
     if not photo_path:
         raise ValueError("photo_path is required")
-    if not os.path.isfile(photo_path):
-        raise ValueError(f"file not found: {photo_path}")
+    if not os.path.isfile(photo_path) or not os.access(photo_path, os.R_OK):
+        raise ValueError(f"file not found or not readable by the GramGate service: {photo_path}")
     rcpt = _parse_chat_id(recipient)
     return JSONResponse(await tg.send_photo(rcpt, photo_path, caption))
 
@@ -749,6 +805,7 @@ def create_app(api_token: str = "", rate_limiter=None) -> Starlette:
 
     return Starlette(
         middleware=[
+            Middleware(AuditMiddleware),  # outermost: sees 401/429 too
             Middleware(ErrorHandlerMiddleware),
             Middleware(AuthMiddleware),
             Middleware(RateLimitMiddleware),

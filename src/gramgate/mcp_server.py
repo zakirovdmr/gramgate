@@ -3,9 +3,13 @@
 import functools
 import json
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
+from starlette.responses import JSONResponse
+
+from . import audit
 
 if TYPE_CHECKING:
     from .telegram import GramGateTelegram
@@ -13,6 +17,78 @@ if TYPE_CHECKING:
 log = logging.getLogger("gramgate.mcp")
 
 mcp = FastMCP("gramgate-telegram")
+
+
+# ==================== Audit + auth plumbing ====================
+
+
+def _client_name() -> str | None:
+    """Name the MCP client announced at initialize (e.g. 'claude-code'); None outside a request."""
+    try:
+        params = mcp.get_context().session.client_params
+        return params.clientInfo.name if params and params.clientInfo else None
+    except Exception:  # noqa: BLE001 — auditing must not break the tool
+        return None
+
+
+def _audited(fn):
+    """Wrap a tool coroutine so every call lands in the audit log (tool name,
+    client, target chat, text length, status). functools.wraps keeps the original
+    signature, so FastMCP still derives the tool schema from the real function."""
+
+    @functools.wraps(fn)
+    async def wrapper(**kwargs):
+        start = time.monotonic()
+        common = dict(
+            caller=_client_name(),
+            target=audit.target_of(kwargs),
+            size=audit.size_of(kwargs),
+        )
+        try:
+            result = await fn(**kwargs)
+        except Exception as e:
+            audit.record("mcp", fn.__name__, status="error",
+                         error=f"{type(e).__name__}: {e}", ms=(time.monotonic() - start) * 1000, **common)
+            raise
+        audit.record("mcp", fn.__name__, status="ok", ms=(time.monotonic() - start) * 1000, **common)
+        return result
+
+    return wrapper
+
+
+_register_tool = mcp.tool
+
+
+def _audited_tool(*args, **kwargs):
+    register = _register_tool(*args, **kwargs)
+
+    def decorator(fn):
+        return register(_audited(fn))
+
+    return decorator
+
+
+# Every @mcp.tool() below goes through the audit wrapper.
+mcp.tool = _audited_tool
+
+
+def bearer_auth(app, token: str):
+    """ASGI wrapper: require `Authorization: Bearer <token>` on every HTTP request
+    (the /sse stream and the /messages/ posts alike). No token = pass-through."""
+    if not token:
+        return app
+    expected = f"Bearer {token}".encode()
+
+    async def guarded(scope, receive, send):
+        if scope.get("type") == "http":
+            headers = dict(scope.get("headers") or [])
+            if headers.get(b"authorization", b"") != expected:
+                log.warning("AUTH 401 MCP %s", scope.get("path"))
+                await JSONResponse({"error": "unauthorized"}, status_code=401)(scope, receive, send)
+                return
+        await app(scope, receive, send)
+
+    return guarded
 
 
 def _parse_id(value: str) -> int | str:

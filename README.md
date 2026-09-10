@@ -247,7 +247,42 @@ Then include the header in all requests:
 curl -H "Authorization: Bearer your-secret-token" http://127.0.0.1:18791/api/me
 ```
 
-The `/health` endpoint is always accessible without auth.
+The `/health` endpoint is always accessible without auth. The same token guards the MCP
+endpoint (`/sse` and `/messages/` on the MCP port) — MCP clients must send the same
+`Authorization` header.
+
+Instead of an inline token you can point to a file that holds only the token, e.g. one
+shared with other local processes:
+
+```bash
+GRAMGATE_API_TOKEN_FILE=/etc/gramgate/token
+```
+
+Clients may add `X-GramGate-Caller: <name>`; the value is written to the audit log.
+
+## Audit log
+
+Set `GRAMGATE_AUDIT_LOG=/path/to/actions.jsonl` to record one JSON line per action —
+REST call, MCP tool call, or bridge message: time, source (`rest`/`mcp`/`bridge`), caller,
+action, target chat, text length, status, duration. Message text is never written; Telegram
+already keeps it. Rotate the file with logrotate (the handler reopens it after rotation).
+
+```json
+{"ts": "2026-09-10T11:40:02.113+00:00", "src": "mcp", "action": "telegram_send_message", "caller": "claude-code", "target": "zakirovdmr", "size": 212, "status": "ok", "ms": 340}
+```
+
+## Telegram errors
+
+Errors raised by Telegram (`CHANNEL_PRIVATE`, `USER_NOT_PARTICIPANT`, `FLOOD_WAIT`...) are
+returned with Telegram's own 4xx code and a JSON body `{"error": "<ID>", "telegram_code": N,
+"detail": "..."}`; flood waits become `429` with `Retry-After`. Only unexpected exceptions
+produce `500`.
+
+## OpenClaw bridge allow-list
+
+By default every private message (and every group mention) from a human sender is
+forwarded to OpenClaw. Set `GRAMGATE_BRIDGE_ALLOW_FROM=113243402,@someone` to forward only
+these senders; everyone else is stored in the feed and ignored. Bots are never bridged.
 
 ## Rate Limiting
 

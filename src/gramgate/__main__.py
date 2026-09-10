@@ -12,22 +12,37 @@ import signal
 import uvicorn
 from pyrogram import idle
 
+from . import audit
 from .api import create_app, set_telegram as api_set_tg
 from .config import Settings
-from .mcp_server import mcp as mcp_server, set_telegram as mcp_set_tg
+from .mcp_server import bearer_auth, mcp as mcp_server, set_telegram as mcp_set_tg
 from .telegram import GramGateTelegram
 
+# force=True: importing FastMCP above already installed its RichHandler on the
+# root logger (80-column wrapped lines); replace it with plain one-line records.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    force=True,
 )
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("pyrogram").setLevel(logging.WARNING)  # "Retrying ..." sync chatter is not actionable
+logging.getLogger("mcp").setLevel(logging.WARNING)  # "Processing request of type ..." per MCP round-trip
 
 log = logging.getLogger("gramgate")
 
 async def run():
     config = Settings()
+
+    api_token = config.resolve_api_token()
+    if api_token:
+        log.info("API auth: bearer token required on REST and MCP")
+    else:
+        log.warning("API auth DISABLED — any local process can drive this account; set GRAMGATE_API_TOKEN(_FILE)")
+
+    if config.audit_log and audit.setup(config.audit_log):
+        log.info("Audit log: %s", config.audit_log)
 
     # OpenClaw bridge is optional
     openclaw = None
@@ -59,7 +74,7 @@ async def run():
     )
 
     # Start HTTP API server BEFORE Telegram auth — so /api/auth/code is available
-    app = create_app(api_token=config.api_token, rate_limiter=rate_limiter)
+    app = create_app(api_token=api_token, rate_limiter=rate_limiter)
     uv_config = uvicorn.Config(app, host=config.api_host, port=config.api_port, log_level="warning")
     uv_server = uvicorn.Server(uv_config)
     asyncio.create_task(uv_server.serve())
@@ -67,7 +82,7 @@ async def run():
 
     # Start MCP server (SSE transport)
     if config.mcp_port:
-        mcp_app = mcp_server.sse_app()
+        mcp_app = bearer_auth(mcp_server.sse_app(), api_token)
         mcp_uv_config = uvicorn.Config(mcp_app, host=config.api_host, port=config.mcp_port, log_level="warning")
         mcp_uv_server = uvicorn.Server(mcp_uv_config)
         asyncio.create_task(mcp_uv_server.serve())
@@ -76,10 +91,7 @@ async def run():
     # Now start Pyrogram — if auth needed, code can be submitted via API
     await tg.start()
 
-    log.info(
-        "GramGate started — phone %s, REST API on http://%s:%d",
-        config.telegram_phone, config.api_host, config.api_port,
-    )
+    log.info("GramGate started — REST API on http://%s:%d", config.api_host, config.api_port)
 
     # Graceful shutdown
     loop = asyncio.get_event_loop()

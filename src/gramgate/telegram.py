@@ -13,6 +13,7 @@ from pyrogram import Client, filters
 from pyrogram.enums import ChatAction, ChatType, ParseMode
 from pyrogram.types import Message
 
+from . import audit
 from .store import MessageStore, StoredMessage
 
 log = logging.getLogger("gramgate.telegram")
@@ -87,6 +88,44 @@ class GramGateTelegram:
         self._auth_code_future: Optional[asyncio.Future] = None
         self._auth_phone_code_hash: Optional[str] = None
         self._skip_file: Optional[Path] = None
+        self._allow_ids, self._allow_names = self._parse_allow_from(
+            getattr(config, "bridge_allow_from", "") or ""
+        )
+        if self._allow_ids or self._allow_names:
+            log.info("Bridge allow-list: ids=%s names=%s", sorted(self._allow_ids), sorted(self._allow_names))
+
+    @staticmethod
+    def _parse_allow_from(raw: str) -> tuple[set[int], set[str]]:
+        """'113243402, @someone' -> ({113243402}, {'someone'}). Never raises."""
+        ids: set[int] = set()
+        names: set[str] = set()
+        for part in raw.split(","):
+            part = part.strip().lstrip("@")
+            if not part:
+                continue
+            if part.lstrip("-").isdigit():
+                ids.add(int(part))
+            else:
+                names.add(part.lower())
+        return ids, names
+
+    def _bridge_allowed(self, message: Message) -> bool:
+        """Allow-list gate for the OpenClaw bridge. Empty list = everyone."""
+        if not self._allow_ids and not self._allow_names:
+            return True
+        user = message.from_user
+        if user is None:
+            return False
+        if user.id in self._allow_ids:
+            return True
+        return bool(user.username) and user.username.lower() in self._allow_names
+
+    @staticmethod
+    def _sender_label(message: Message) -> str:
+        user = message.from_user
+        if user is None:
+            return "?"
+        return str(user.username or user.id)
 
     def _load_skip_chats(self) -> set[int]:
         """Seed the bridge skip-list from config + the persistent file.
@@ -145,14 +184,20 @@ class GramGateTelegram:
         # Private messages (not from self)
         @self.client.on_message(filters.private & ~filters.me)
         async def on_private(client: Client, message: Message):
-            sender = message.from_user.username or message.from_user.id if message.from_user else "?"
-            log.info("MSG private from=%s text=%s", sender, (message.text or "")[:80])
+            sender = self._sender_label(message)
+            # Length only — message text is personal data and lives in Telegram anyway.
+            log.info("MSG private from=%s len=%d", sender, len(message.text or message.caption or ""))
             self._store_message(message)
             if message.chat.id in self._skip_chat_ids:
                 log.debug("Skipped (in skip list): chat=%s", message.chat.id)
                 return
             if self._is_bot_sender(message):
                 log.info("Skipped (bot sender, not bridged): chat=%s", message.chat.id)
+                return
+            if not self._bridge_allowed(message):
+                log.info("Skipped (sender not in bridge allow-list): chat=%s from=%s", message.chat.id, sender)
+                audit.record("bridge", "inbound", caller=sender, target=message.chat.id,
+                             size=len(message.text or message.caption or ""), status="denied")
                 return
             if self.openclaw:
                 await self._handle(message)
@@ -162,10 +207,15 @@ class GramGateTelegram:
         async def on_group(client: Client, message: Message):
             self._store_message(message)
             if message.mentioned and self.openclaw:
-                sender = message.from_user.username or message.from_user.id if message.from_user else "?"
-                log.info("MSG mention group=%s from=%s text=%s", message.chat.id, sender, (message.text or "")[:80])
+                sender = self._sender_label(message)
+                log.info("MSG mention group=%s from=%s len=%d", message.chat.id, sender, len(message.text or message.caption or ""))
                 if self._is_bot_sender(message):
                     log.info("Skipped (bot sender, not bridged): group=%s from=%s", message.chat.id, sender)
+                    return
+                if not self._bridge_allowed(message):
+                    log.info("Skipped (sender not in bridge allow-list): group=%s from=%s", message.chat.id, sender)
+                    audit.record("bridge", "inbound", caller=sender, target=message.chat.id,
+                                 size=len(message.text or message.caption or ""), status="denied")
                     return
                 await self._handle(message, is_group=True)
 
@@ -284,6 +334,7 @@ class GramGateTelegram:
         chat_id = message.chat.id
         session_key = f"gramgate:{chat_id}"
         typing_task: Optional[asyncio.Task] = None
+        audit.record("bridge", "inbound", caller=self._sender_label(message), target=chat_id, size=len(text))
 
         try:
             try:
@@ -301,6 +352,7 @@ class GramGateTelegram:
             if response:
                 log.info("BRIDGE ← OpenClaw chat=%s response_len=%d", chat_id, len(response))
                 await self._send_reply(chat_id, response, reply_to=message.id)
+                audit.record("bridge", "outbound", target=chat_id, size=len(response))
                 try:
                     await self.client.send_reaction(chat_id, message_id=message.id, emoji=None)
                 except Exception:
@@ -308,6 +360,7 @@ class GramGateTelegram:
 
         except Exception as e:
             log.error("Error handling message from %s: %s", chat_id, e)
+            audit.record("bridge", "outbound", target=chat_id, status="error", error=f"{type(e).__name__}: {e}")
             try:
                 await self.client.send_reaction(chat_id, message_id=message.id, emoji="\U0001f622")
             except Exception:

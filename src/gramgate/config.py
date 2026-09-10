@@ -1,5 +1,7 @@
 """GramGate configuration."""
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -16,6 +18,9 @@ class Settings(BaseSettings):
     # API
     api_port: int = Field(default=18791, alias="GRAMGATE_API_PORT")
     api_token: str = Field(default="", alias="GRAMGATE_API_TOKEN")
+    # Alternative to the inline token: a file holding only the token
+    # (e.g. /etc/gramgate/token) that local clients can share. Inline wins.
+    api_token_file: str = Field(default="", alias="GRAMGATE_API_TOKEN_FILE")
     api_host: str = Field(default="127.0.0.1", alias="GRAMGATE_API_HOST")
 
     # MCP server (0 = disabled)
@@ -37,6 +42,23 @@ class Settings(BaseSettings):
     # bridge → OpenClaw → bot). Comma-separated. Seeds the persistent
     # skip-list on startup; runtime /api/chat/skip additions persist too.
     bridge_skip_chats: str = Field(default="", alias="GRAMGATE_BRIDGE_SKIP_CHATS")
+
+    # Bridge allow-list: user ids and/or @usernames whose private messages and
+    # group mentions may be forwarded to OpenClaw. Comma-separated.
+    # Empty = everyone who writes to the account (legacy behaviour).
+    bridge_allow_from: str = Field(default="", alias="GRAMGATE_BRIDGE_ALLOW_FROM")
+
+    # Action audit log — JSON lines with who/what/which chat/size/status,
+    # never message text. Empty = disabled.
+    audit_log: str = Field(default="", alias="GRAMGATE_AUDIT_LOG")
+
+    def resolve_api_token(self) -> str:
+        """Inline token wins; otherwise the token file; empty string = auth disabled."""
+        if self.api_token.strip():
+            return self.api_token.strip()
+        if self.api_token_file:
+            return Path(self.api_token_file).read_text(encoding="utf-8").strip()
+        return ""
 
     model_config = {
         "env_file": ".env",
