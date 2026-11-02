@@ -11,6 +11,7 @@ from typing import Optional
 
 from pyrogram import Client, filters
 from pyrogram.enums import ChatAction, ChatType, ParseMode
+from pyrogram.parser.markdown import Markdown
 from pyrogram.types import Message
 
 from . import audit
@@ -25,6 +26,21 @@ AUTH_STATE_NONE = "none"
 AUTH_STATE_AWAITING_CODE = "awaiting_code"
 AUTH_STATE_AWAITING_2FA = "awaiting_2fa"
 AUTH_STATE_AUTHORIZED = "authorized"
+
+
+_ESCAPED_EXPANDABLE_QUOTE = re.compile(r"(^|\n)\*\*&gt;")
+
+
+class _GramGateMarkdown(Markdown):
+    """Markdown parser that keeps pyrofork's expandable quotes working.
+
+    ParseMode.MARKDOWN is strict: pyrofork HTML-escapes the text before it
+    looks for quotes and then restores only a bare leading '>', so a line
+    starting with '**>' (expandable quote) arrives as '**&gt;' and is missed.
+    """
+
+    def blockquote_parser(self, text):
+        return super().blockquote_parser(_ESCAPED_EXPANDABLE_QUOTE.sub(r"\1**>", text))
 
 
 def _convert_markdown_for_telegram(text: str) -> str:
@@ -173,6 +189,7 @@ class GramGateTelegram:
             phone_number=self.config.telegram_phone,
             workdir=str(session_dir),
         )
+        self.client.parser.markdown = _GramGateMarkdown(self.client)
 
         # Chat IDs to skip (bots we drive via API/MCP, not OpenClaw bridge).
         # Persisted across restarts: seeded from GRAMGATE_BRIDGE_SKIP_CHATS
