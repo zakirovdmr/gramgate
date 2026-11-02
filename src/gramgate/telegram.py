@@ -44,10 +44,19 @@ class _GramGateMarkdown(Markdown):
 
 
 def _convert_markdown_for_telegram(text: str) -> str:
-    """Convert GitHub-style Markdown headers to Telegram-compatible bold."""
-    text = re.sub(r"^#{1,6}\s+(.+)$", r"**\1**", text, flags=re.MULTILINE)
-    text = re.sub(r"^---+$", "\u2501" * 10, text, flags=re.MULTILINE)
-    return text
+    """Convert GitHub-style Markdown headers to Telegram-compatible bold.
+
+    Text inside closed ``` code blocks is left as is, so code and Markdown
+    sent as code keep their '#' headers and '---' lines.
+    """
+    parts = text.split("```")
+    last = len(parts) - 1
+    for i, part in enumerate(parts):
+        if i % 2 == 1 and i < last:  # between an opening and a closing ```
+            continue
+        part = re.sub(r"^#{1,6}\s+(.+)$", r"**\1**", part, flags=re.MULTILINE)
+        parts[i] = re.sub(r"^---+$", "\u2501" * 10, part, flags=re.MULTILINE)
+    return "```".join(parts)
 
 
 def _split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
